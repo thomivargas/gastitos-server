@@ -1,0 +1,420 @@
+// ============================================================================
+// Gastitos - Schema de Base de Datos
+// App de finanzas personales
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum TipoCuenta {
+  EFECTIVO
+  BANCO_CORRIENTE
+  BANCO_AHORRO
+  TARJETA_CREDITO
+  INVERSION
+  PRESTAMO
+  OTRO_ACTIVO
+  OTRO_PASIVO
+}
+
+enum ClasificacionCuenta {
+  ACTIVO
+  PASIVO
+}
+
+enum EstadoCuenta {
+  ACTIVA
+  INACTIVA
+  ARCHIVADA
+}
+
+enum ClasificacionCategoria {
+  INGRESO
+  GASTO
+}
+
+enum TipoTransaccion {
+  INGRESO
+  GASTO
+  TRANSFERENCIA
+}
+
+enum Rol {
+  USUARIO
+  ADMIN
+}
+
+enum FrecuenciaRecurrencia {
+  DIARIA
+  SEMANAL
+  QUINCENAL
+  MENSUAL
+  BIMESTRAL
+  TRIMESTRAL
+  SEMESTRAL
+  ANUAL
+}
+
+// ============================================================================
+// USUARIO
+// ============================================================================
+
+model Usuario {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  nombre        String
+  passwordHash  String   @map("password_hash")
+  rol           Rol      @default(USUARIO)
+  moneda        String   @default("ARS") // moneda principal del usuario
+  preferencias  Json     @default("{}") // formato fecha, locale, zona horaria, etc.
+  creadoEl      DateTime @default(now()) @map("creado_el")
+  actualizadoEl DateTime @updatedAt @map("actualizado_el")
+
+  cuentas                  Cuenta[]
+  categorias               Categoria[]
+  etiquetas                Etiqueta[]
+  presupuestos             Presupuesto[]
+  transacciones            Transaccion[]
+  transaccionesRecurrentes TransaccionRecurrente[]
+  reglasCategorizacion     ReglaCategorizacion[]
+  sesiones                 Sesion[]
+
+  @@map("usuarios")
+}
+
+// ============================================================================
+// CUENTAS
+// ============================================================================
+// Representa cualquier cuenta financiera: banco, efectivo, tarjeta, etc.
+// El campo `clasificacion` se deriva del `tipo`:
+//   ACTIVO  -> EFECTIVO, BANCO_CORRIENTE, BANCO_AHORRO, INVERSION, OTRO_ACTIVO
+//   PASIVO  -> TARJETA_CREDITO, PRESTAMO, OTRO_PASIVO
+
+model Cuenta {
+  id            String              @id @default(uuid())
+  usuarioId     String              @map("usuario_id")
+  nombre        String
+  tipo          TipoCuenta
+  clasificacion ClasificacionCuenta
+  moneda        String              @default("ARS")
+  balance       Decimal             @default(0) @db.Decimal(19, 4)
+  estado        EstadoCuenta        @default(ACTIVA)
+  institucion   String? // nombre del banco o institucion financiera
+  color         String              @default("#6172F3")
+  icono         String              @default("wallet")
+  notas         String?
+  // Campos opcionales segun tipo de cuenta (ej: limite de credito, tasa interes)
+  detalles      Json                @default("{}")
+  creadoEl      DateTime            @default(now()) @map("creado_el")
+  actualizadoEl DateTime            @updatedAt @map("actualizado_el")
+
+  usuario                  Usuario                @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  transacciones            Transaccion[]
+  balancesHistoricos       BalanceHistorico[]
+  transferenciasOrigen     Transferencia[]        @relation("CuentaOrigen")
+  transferenciasDestino    Transferencia[]        @relation("CuentaDestino")
+  transaccionesRecurrentes TransaccionRecurrente[]
+
+  @@index([usuarioId, estado])
+  @@index([usuarioId, tipo])
+  @@map("cuentas")
+}
+
+// ============================================================================
+// CATEGORIAS
+// ============================================================================
+// Jerarquicas: una categoria puede tener subcategorias (1 nivel de profundidad).
+// Clasificadas como INGRESO o GASTO.
+
+model Categoria {
+  id            String                 @id @default(uuid())
+  usuarioId     String                 @map("usuario_id")
+  nombre        String
+  color         String                 @default("#6172F3")
+  icono         String                 @default("shapes")
+  clasificacion ClasificacionCategoria
+  padreId       String?                @map("padre_id")
+  creadoEl      DateTime               @default(now()) @map("creado_el")
+  actualizadoEl DateTime               @updatedAt @map("actualizado_el")
+
+  usuario               Usuario                @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  padre                 Categoria?             @relation("SubCategorias", fields: [padreId], references: [id], onDelete: SetNull)
+  subcategorias         Categoria[]            @relation("SubCategorias")
+  transacciones         Transaccion[]
+  presupuestoCategorias PresupuestoCategoria[]
+  reglasCategorizacion  ReglaCategorizacion[]
+
+  @@unique([usuarioId, nombre, padreId])
+  @@index([usuarioId, clasificacion])
+  @@map("categorias")
+}
+
+// ============================================================================
+// ETIQUETAS
+// ============================================================================
+// Tags libres para organizar transacciones (ej: "vacaciones", "impuestos")
+
+model Etiqueta {
+  id            String                @id @default(uuid())
+  usuarioId     String                @map("usuario_id")
+  nombre        String
+  color         String                @default("#6172F3")
+  creadoEl      DateTime              @default(now()) @map("creado_el")
+  actualizadoEl DateTime              @updatedAt @map("actualizado_el")
+
+  usuario       Usuario               @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  transacciones TransaccionEtiqueta[]
+
+  @@unique([usuarioId, nombre])
+  @@map("etiquetas")
+}
+
+// ============================================================================
+// TRANSACCIONES
+// ============================================================================
+// Registro central de movimientos financieros.
+// `monto` siempre es positivo; `tipo` determina la direccion:
+//   INGRESO       -> suma al balance de la cuenta
+//   GASTO         -> resta del balance de la cuenta
+//   TRANSFERENCIA -> vinculada a otra transaccion via tabla `transferencias`
+
+model Transaccion {
+  id            String          @id @default(uuid())
+  cuentaId      String          @map("cuenta_id")
+  usuarioId     String          @map("usuario_id")
+  categoriaId   String?         @map("categoria_id")
+  tipo          TipoTransaccion
+  monto         Decimal         @db.Decimal(19, 4)
+  moneda        String // permite transacciones en moneda distinta a la cuenta
+  fecha         DateTime        @db.Date
+  descripcion   String
+  notas         String?
+  excluida      Boolean         @default(false) // excluir de reportes/presupuestos
+  tasaCambio    Decimal?        @map("tasa_cambio") @db.Decimal(19, 10) // tasa usada si moneda != cuenta.moneda
+  creadoEl      DateTime        @default(now()) @map("creado_el")
+  actualizadoEl DateTime        @updatedAt @map("actualizado_el")
+
+  cuenta    Cuenta     @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+  usuario   Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  categoria Categoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+
+  etiquetas            TransaccionEtiqueta[]
+  transferenciaOrigen  Transferencia?        @relation("TransaccionOrigen")
+  transferenciaDestino Transferencia?        @relation("TransaccionDestino")
+
+  @@index([cuentaId, fecha])
+  @@index([usuarioId, fecha])
+  @@index([categoriaId])
+  @@index([tipo])
+  @@map("transacciones")
+}
+
+// ============================================================================
+// TRANSACCION <-> ETIQUETA (muchos a muchos)
+// ============================================================================
+
+model TransaccionEtiqueta {
+  transaccionId String @map("transaccion_id")
+  etiquetaId    String @map("etiqueta_id")
+
+  transaccion Transaccion @relation(fields: [transaccionId], references: [id], onDelete: Cascade)
+  etiqueta    Etiqueta    @relation(fields: [etiquetaId], references: [id], onDelete: Cascade)
+
+  @@id([transaccionId, etiquetaId])
+  @@map("transacciones_etiquetas")
+}
+
+// ============================================================================
+// TRANSFERENCIAS
+// ============================================================================
+// Vincula dos transacciones que representan un movimiento entre cuentas.
+// Ejemplo: transferir $1000 de Banco a Efectivo crea:
+//   - Transaccion TRANSFERENCIA en Banco (salida)
+//   - Transaccion TRANSFERENCIA en Efectivo (entrada)
+//   - Transferencia que las vincula
+
+model Transferencia {
+  id                   String   @id @default(uuid())
+  transaccionOrigenId  String   @unique @map("transaccion_origen_id")
+  transaccionDestinoId String   @unique @map("transaccion_destino_id")
+  cuentaOrigenId       String   @map("cuenta_origen_id")
+  cuentaDestinoId      String   @map("cuenta_destino_id")
+  creadoEl             DateTime @default(now()) @map("creado_el")
+
+  transaccionOrigen  Transaccion @relation("TransaccionOrigen", fields: [transaccionOrigenId], references: [id], onDelete: Cascade)
+  transaccionDestino Transaccion @relation("TransaccionDestino", fields: [transaccionDestinoId], references: [id], onDelete: Cascade)
+  cuentaOrigen       Cuenta      @relation("CuentaOrigen", fields: [cuentaOrigenId], references: [id])
+  cuentaDestino      Cuenta      @relation("CuentaDestino", fields: [cuentaDestinoId], references: [id])
+
+  @@map("transferencias")
+}
+
+// ============================================================================
+// PRESUPUESTOS
+// ============================================================================
+// Presupuesto por periodo (tipicamente mensual).
+// Contiene un tope general y asignaciones por categoria.
+
+model Presupuesto {
+  id                 String   @id @default(uuid())
+  usuarioId          String   @map("usuario_id")
+  fechaInicio        DateTime @map("fecha_inicio") @db.Date
+  fechaFin           DateTime @map("fecha_fin") @db.Date
+  gastoPresupuestado Decimal? @map("gasto_presupuestado") @db.Decimal(19, 4)
+  ingresoEsperado    Decimal? @map("ingreso_esperado") @db.Decimal(19, 4)
+  moneda             String
+  creadoEl           DateTime @default(now()) @map("creado_el")
+  actualizadoEl      DateTime @updatedAt @map("actualizado_el")
+
+  usuario    Usuario                @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  categorias PresupuestoCategoria[]
+
+  @@unique([usuarioId, fechaInicio, fechaFin])
+  @@map("presupuestos")
+}
+
+// ============================================================================
+// PRESUPUESTO POR CATEGORIA
+// ============================================================================
+// Cuanto se asigna a cada categoria dentro de un presupuesto.
+
+model PresupuestoCategoria {
+  id                 String   @id @default(uuid())
+  presupuestoId      String   @map("presupuesto_id")
+  categoriaId        String   @map("categoria_id")
+  montoPresupuestado Decimal  @map("monto_presupuestado") @db.Decimal(19, 4)
+  creadoEl           DateTime @default(now()) @map("creado_el")
+  actualizadoEl      DateTime @updatedAt @map("actualizado_el")
+
+  presupuesto Presupuesto @relation(fields: [presupuestoId], references: [id], onDelete: Cascade)
+  categoria   Categoria   @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@unique([presupuestoId, categoriaId])
+  @@map("presupuesto_categorias")
+}
+
+// ============================================================================
+// TRANSACCIONES RECURRENTES
+// ============================================================================
+// Plantillas para generar transacciones automaticamente segun una frecuencia.
+
+model TransaccionRecurrente {
+  id            String                @id @default(uuid())
+  usuarioId     String                @map("usuario_id")
+  cuentaId      String                @map("cuenta_id")
+  categoriaId   String?               @map("categoria_id")
+  tipo          TipoTransaccion
+  monto         Decimal               @db.Decimal(19, 4)
+  moneda        String
+  descripcion   String
+  frecuencia    FrecuenciaRecurrencia
+  diaDelMes     Int?                  @map("dia_del_mes") // para frecuencias mensuales+
+  diaDeLaSemana Int?                  @map("dia_de_la_semana") // 0=lunes, 6=domingo
+  proximaFecha  DateTime              @map("proxima_fecha") @db.Date
+  activa        Boolean               @default(true)
+  creadoEl      DateTime              @default(now()) @map("creado_el")
+  actualizadoEl DateTime              @updatedAt @map("actualizado_el")
+
+  usuario  Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  cuenta   Cuenta   @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, activa])
+  @@index([proximaFecha])
+  @@map("transacciones_recurrentes")
+}
+
+// ============================================================================
+// BALANCE HISTORICO
+// ============================================================================
+// Snapshot diario del balance de cada cuenta para graficos de tendencia.
+
+model BalanceHistorico {
+  id       String   @id @default(uuid())
+  cuentaId String   @map("cuenta_id")
+  fecha    DateTime @db.Date
+  balance  Decimal  @db.Decimal(19, 4)
+  moneda   String
+  creadoEl DateTime @default(now()) @map("creado_el")
+
+  cuenta Cuenta @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+
+  @@unique([cuentaId, fecha])
+  @@index([cuentaId, fecha(sort: Desc)])
+  @@map("balances_historicos")
+}
+
+// ============================================================================
+// TASAS DE CAMBIO
+// ============================================================================
+// Historial de tasas de cambio entre monedas para soporte multi-moneda.
+
+model TasaCambio {
+  id            String   @id @default(uuid())
+  monedaOrigen  String   @map("moneda_origen")
+  monedaDestino String   @map("moneda_destino")
+  tasa          Decimal  @db.Decimal(19, 10)
+  fecha         DateTime @db.Date
+  creadoEl      DateTime @default(now()) @map("creado_el")
+
+  @@unique([monedaOrigen, monedaDestino, fecha])
+  @@index([monedaOrigen])
+  @@index([monedaDestino])
+  @@map("tasas_cambio")
+}
+
+// ============================================================================
+// REGLAS DE CATEGORIZACION
+// ============================================================================
+// Reglas definidas por el usuario para auto-categorizar transacciones
+// basandose en patrones de texto en la descripcion.
+
+model ReglaCategorizacion {
+  id            String   @id @default(uuid())
+  usuarioId     String   @map("usuario_id")
+  nombre        String
+  patron        String // texto a buscar en descripcion (case-insensitive)
+  categoriaId   String   @map("categoria_id")
+  prioridad     Int      @default(0) // mayor = se evalua primero
+  activa        Boolean  @default(true)
+  creadoEl      DateTime @default(now()) @map("creado_el")
+  actualizadoEl DateTime @updatedAt @map("actualizado_el")
+
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  categoria Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, nombre])
+  @@index([usuarioId, activa])
+  @@map("reglas_categorizacion")
+}
+
+// ============================================================================
+// SESIONES
+// ============================================================================
+// Sesiones activas del usuario. El refresh token se guarda hasheado.
+// Permite revocar sesiones, detectar reuso de tokens y limitar sesiones activas.
+
+model Sesion {
+  id         String   @id @default(uuid())
+  usuarioId  String   @map("usuario_id")
+  tokenHash  String   @unique @map("token_hash")
+  usado      Boolean  @default(false) // true = ya se roto, si se reusa es posible robo
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  expiraEl   DateTime @map("expira_el")
+  creadoEl   DateTime @default(now()) @map("creado_el")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@index([expiraEl])
+  @@map("sesiones")
+}

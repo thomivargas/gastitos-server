@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",           // Más moderno, mejor soporte async/await nativo
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "types": ["node"],
+
+    // Calidad de código
+    "strict": true,
+    "noUncheckedIndexedAccess": true,   // arr[0] puede ser undefined
+    "noImplicitReturns": true,           // Todas las rutas deben retornar
+    "noFallthroughCasesInSwitch": true,  // Switch sin break intencional
+    "exactOptionalPropertyTypes": true,  // Diferencia entre undefined y ausente
+
+    // Interop
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+
+    // Output
+    "declaration": true,
+    "declarationMap": true,   // Agrega esto si usas declaration: true
+    "sourceMap": true,
+    "removeComments": true,   // Build más limpio
+
+    // Paths
+    "paths": {
+      "@modules/*": ["./src/modules/*"],
+      "@config/*": ["./src/config/*"],
+      "@middlewares/*": ["./src/middlewares/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@jobs/*": ["./src/jobs/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
