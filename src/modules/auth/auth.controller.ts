@@ -8,11 +8,11 @@ const COOKIE_NAME = 'gastitos_rt';
 function cookieOptions() {
   const isProduction = env.NODE_ENV === 'production';
   return {
-    httpOnly: true,                    // JS no puede leerla
-    secure: isProduction,              // solo HTTPS en produccion
-    sameSite: 'strict' as const,       // no se envia cross-site
-    path: '/api/auth',                 // solo se envia a rutas de auth
-    maxAge: 7 * 24 * 60 * 60 * 1000,  // 7 dias en ms
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' as const : 'strict' as const,
+    path: '/api/auth',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   };
 }
 
