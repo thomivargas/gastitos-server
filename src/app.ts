@@ -22,7 +22,7 @@ if (allowedOrigins.includes('*')) {
 }
 app.use(
   cors({
-    origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
+    origin: allowedOrigins.length === 1 ? allowedOrigins[0]! : allowedOrigins,
     credentials: true,
   }),
 );
