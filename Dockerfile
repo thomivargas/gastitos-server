@@ -10,6 +10,11 @@ COPY prisma.config.ts ./
 COPY tsconfig.json ./
 COPY src ./src
 
+# Dummy env vars — solo para que prisma generate y tsc pasen en build time
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" \
+    JWT_ACCESS_SECRET="build-time-placeholder-1234567890" \
+    JWT_REFRESH_SECRET="build-time-placeholder-0987654321"
+
 RUN npm run build
 
 # --- Production ---
