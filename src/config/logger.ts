@@ -11,14 +11,14 @@ export const logger = pino({
       return { level: label };
     },
   },
-  transport: isDev
-    ? {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'yyyy-mm-dd HH:MM:ss.l',
-          ignore: 'pid,hostname',
-        },
-      }
-    : undefined,
+  ...(isDev && {
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'yyyy-mm-dd HH:MM:ss.l',
+        ignore: 'pid,hostname',
+      },
+    },
+  }),
 });

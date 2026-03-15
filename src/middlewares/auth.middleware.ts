@@ -22,7 +22,7 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
     return next(new UnauthorizedError('Token no proporcionado'));
   }
 
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.split(' ')[1]!;
 
   try {
     const payload = verifyAccessToken(token);

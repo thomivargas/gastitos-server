@@ -65,7 +65,13 @@ export async function actualizar(usuarioId: string, reglaId: string, data: Actua
 
   return prisma.reglaCategorizacion.update({
     where: { id: reglaId },
-    data,
+    data: {
+      ...(data.nombre !== undefined && { nombre: data.nombre }),
+      ...(data.patron !== undefined && { patron: data.patron }),
+      ...(data.categoriaId !== undefined && { categoriaId: data.categoriaId }),
+      ...(data.prioridad !== undefined && { prioridad: data.prioridad }),
+      ...(data.activa !== undefined && { activa: data.activa }),
+    },
     select: selectRegla,
   });
 }

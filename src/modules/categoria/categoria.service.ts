@@ -166,9 +166,9 @@ export async function crear(usuarioId: string, data: CrearCategoriaInput) {
       usuarioId,
       nombre: data.nombre,
       clasificacion: data.clasificacion,
-      color: data.color,
-      icono: data.icono,
-      padreId: data.padreId,
+      ...(data.color !== undefined && { color: data.color }),
+      ...(data.icono !== undefined && { icono: data.icono }),
+      ...(data.padreId !== undefined && { padreId: data.padreId }),
     },
     select: selectCategoria,
   });

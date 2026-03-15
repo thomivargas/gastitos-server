@@ -16,13 +16,16 @@ function makeStore(prefix: string): Store | undefined {
   }
 }
 
+const authStore = makeStore('auth');
+const apiStore = makeStore('api');
+
 // Límite estricto para login: 10 intentos por ventana de 15 min
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  store: makeStore('auth'),
+  ...(authStore && { store: authStore }),
   message: { status: 'error', message: 'Demasiados intentos. Intenta de nuevo en 15 minutos.' },
 });
 
@@ -32,6 +35,6 @@ export const apiLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  store: makeStore('api'),
+  ...(apiStore && { store: apiStore }),
   message: { status: 'error', message: 'Demasiadas solicitudes. Intenta de nuevo en un momento.' },
 });

@@ -51,8 +51,8 @@ export async function crear(userId: string, data: CrearPresupuestoData) {
         usuarioId: userId,
         fechaInicio,
         fechaFin,
-        gastoPresupuestado: data.gastoPresupuestado,
-        ingresoEsperado: data.ingresoEsperado,
+        gastoPresupuestado: data.gastoPresupuestado ?? null,
+        ingresoEsperado: data.ingresoEsperado ?? null,
         moneda: data.moneda,
       },
     });
@@ -137,7 +137,11 @@ export async function actualizar(
 
   return prisma.presupuesto.update({
     where: { id: presupuestoId },
-    data,
+    data: {
+      ...(data.gastoPresupuestado !== undefined && { gastoPresupuestado: data.gastoPresupuestado ?? null }),
+      ...(data.ingresoEsperado !== undefined && { ingresoEsperado: data.ingresoEsperado ?? null }),
+      ...(data.moneda !== undefined && { moneda: data.moneda }),
+    },
     include: incluirCategorias,
   });
 }

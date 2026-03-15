@@ -54,7 +54,7 @@ export async function crear(usuarioId: string, data: CrearTransferenciaInput) {
         moneda: cuentaOrigen.moneda,
         fecha: new Date(data.fecha),
         descripcion,
-        notas: data.notas,
+        notas: data.notas ?? null,
       },
     });
 
@@ -68,7 +68,7 @@ export async function crear(usuarioId: string, data: CrearTransferenciaInput) {
         moneda: cuentaDestino.moneda,
         fecha: new Date(data.fecha),
         descripcion,
-        notas: data.notas,
+        notas: data.notas ?? null,
       },
     });
 

@@ -14,7 +14,7 @@ export async function crear(usuarioId: string, data: CrearEtiquetaInput) {
     data: {
       usuarioId,
       nombre: data.nombre,
-      color: data.color,
+      ...(data.color !== undefined && { color: data.color }),
     },
     select: selectEtiqueta,
   });

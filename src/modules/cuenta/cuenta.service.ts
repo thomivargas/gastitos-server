@@ -40,10 +40,10 @@ export async function crear(usuarioId: string, data: CrearCuentaInput) {
       clasificacion,
       moneda: data.moneda ?? 'ARS',
       balance: data.balanceInicial ?? 0,
-      institucion: data.institucion,
-      color: data.color,
-      icono: data.icono,
-      notas: data.notas,
+      institucion: data.institucion ?? null,
+      ...(data.color !== undefined && { color: data.color }),
+      ...(data.icono !== undefined && { icono: data.icono }),
+      notas: data.notas ?? null,
       detalles: (data.detalles as object) ?? {},
     },
     select: selectCuenta,
@@ -227,10 +227,11 @@ export async function obtenerResumen(
       }
     } else {
       if (!sinConvertir[cuenta.moneda]) sinConvertir[cuenta.moneda] = { activos: new Decimal(0), pasivos: new Decimal(0) };
+      const entry = sinConvertir[cuenta.moneda]!;
       if (cuenta.clasificacion === 'ACTIVO') {
-        sinConvertir[cuenta.moneda].activos = sumar(sinConvertir[cuenta.moneda].activos, balance);
+        entry.activos = sumar(entry.activos, balance);
       } else {
-        sinConvertir[cuenta.moneda].pasivos = sumar(sinConvertir[cuenta.moneda].pasivos, balance);
+        entry.pasivos = sumar(entry.pasivos, balance);
       }
     }
   }

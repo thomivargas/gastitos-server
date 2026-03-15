@@ -12,7 +12,7 @@ export interface JwtPayload {
  */
 export function generateAccessToken(payload: JwtPayload): string {
   return jwt.sign(payload, env.JWT_ACCESS_SECRET, {
-    expiresIn: env.JWT_ACCESS_EXPIRES_IN as jwt.SignOptions['expiresIn'],
+    expiresIn: parseDuration(env.JWT_ACCESS_EXPIRES_IN) / 1000,
   });
 }
 
@@ -21,7 +21,7 @@ export function generateAccessToken(payload: JwtPayload): string {
  */
 export function generateRefreshToken(payload: JwtPayload): string {
   return jwt.sign(payload, env.JWT_REFRESH_SECRET, {
-    expiresIn: env.JWT_REFRESH_EXPIRES_IN as jwt.SignOptions['expiresIn'],
+    expiresIn: parseDuration(env.JWT_REFRESH_EXPIRES_IN) / 1000,
   });
 }
 
@@ -46,8 +46,8 @@ function parseDuration(duration: string): number {
   const match = duration.match(/^(\d+)([dhms])$/);
   if (!match) throw new Error(`Formato de duracion invalido: "${duration}". Usar Nd, Nh, Nm o Ns.`);
 
-  const value = parseInt(match[1]);
-  const unit = match[2];
+  const value = parseInt(match[1]!);
+  const unit = match[2]!;
   const multipliers: Record<string, number> = {
     s: 1000,
     m: 60 * 1000,
@@ -55,7 +55,7 @@ function parseDuration(duration: string): number {
     d: 24 * 60 * 60 * 1000,
   };
 
-  return value * multipliers[unit];
+  return value * multipliers[unit]!;
 }
 
 /**

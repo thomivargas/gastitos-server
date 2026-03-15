@@ -57,8 +57,8 @@ async function crearSesion(payload: JwtPayload, info: SesionInfo, db: DbClient =
     data: {
       usuarioId: payload.sub,
       tokenHash,
-      ipAddress: info.ip,
-      userAgent: info.userAgent?.substring(0, 500),
+      ipAddress: info.ip ?? null,
+      userAgent: info.userAgent?.substring(0, 500) ?? null,
       expiraEl: getRefreshTokenExpiry(),
     },
   });

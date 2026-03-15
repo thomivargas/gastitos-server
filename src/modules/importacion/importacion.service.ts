@@ -11,8 +11,8 @@ interface FilaParseada {
   monto: number;
   tipo: 'INGRESO' | 'GASTO';
   descripcion: string;
-  categoriaNombre?: string;
-  notas?: string;
+  categoriaNombre: string | undefined;
+  notas: string | undefined;
 }
 
 interface ErrorFila {
@@ -32,7 +32,7 @@ export function preview(buffer: Buffer) {
   });
 
   if (resultado.errors.length > 0 && resultado.data.length === 0) {
-    throw new BadRequestError(`Error al parsear CSV: ${resultado.errors[0].message}`);
+    throw new BadRequestError(`Error al parsear CSV: ${resultado.errors[0]!.message}`);
   }
 
   return {
@@ -53,13 +53,13 @@ function parsearFecha(valor: string, formato: string): Date | null {
 
   try {
     if (formato === 'YYYY-MM-DD') {
-      [anio, mes, dia] = limpio.split('-').map(Number);
+      [anio, mes, dia] = limpio.split('-').map(Number) as [number, number, number];
     } else if (formato === 'DD/MM/YYYY') {
-      [dia, mes, anio] = limpio.split('/').map(Number);
+      [dia, mes, anio] = limpio.split('/').map(Number) as [number, number, number];
     } else if (formato === 'MM/DD/YYYY') {
-      [mes, dia, anio] = limpio.split('/').map(Number);
+      [mes, dia, anio] = limpio.split('/').map(Number) as [number, number, number];
     } else if (formato === 'DD-MM-YYYY') {
-      [dia, mes, anio] = limpio.split('-').map(Number);
+      [dia, mes, anio] = limpio.split('-').map(Number) as [number, number, number];
     } else {
       return null;
     }
@@ -152,7 +152,7 @@ function parsearFilas(
     // Tipo: si hay columna mapeada la usa, sino infiere del signo del monto
     let tipo: 'INGRESO' | 'GASTO';
     if (mapeo.tipo && raw[mapeo.tipo]) {
-      const tipoRaw = raw[mapeo.tipo].trim().toUpperCase();
+      const tipoRaw = raw[mapeo.tipo]!.trim().toUpperCase();
       if (tipoRaw === 'INGRESO' || tipoRaw === 'INCOME' || tipoRaw === 'CREDITO' || tipoRaw === 'CR') {
         tipo = 'INGRESO';
       } else {
@@ -204,7 +204,7 @@ export async function ejecutar(
   if (filas.length === 0) {
     throw new BadRequestError(
       errores.length > 0
-        ? `No se pudo importar ninguna fila. Primer error: ${errores[0].error}`
+        ? `No se pudo importar ninguna fila. Primer error: ${errores[0]!.error}`
         : 'El archivo CSV esta vacio',
     );
   }
@@ -267,7 +267,7 @@ export async function ejecutar(
       fecha: fila.fecha,
       descripcion: fila.descripcion,
       categoriaId,
-      notas: fila.notas,
+      notas: fila.notas ?? null,
     });
   }
 
@@ -350,7 +350,7 @@ export async function exportar(usuarioId: string, query: ExportarQuery): Promise
       });
     }
 
-    cursor = batch[batch.length - 1].id;
+    cursor = batch[batch.length - 1]!.id;
     if (batch.length < PAGE_SIZE) break;
   }
 

@@ -315,7 +315,7 @@ export async function flujoDeCaja(userId: string, query: FlujoCajaQuery) {
 function generarClavePeriodo(fecha: Date, agrupacion: 'dia' | 'semana' | 'mes'): string {
   const d = new Date(fecha);
   if (agrupacion === 'dia') {
-    return d.toISOString().split('T')[0];
+    return d.toISOString().split('T')[0]!;
   }
   if (agrupacion === 'mes') {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -324,7 +324,7 @@ function generarClavePeriodo(fecha: Date, agrupacion: 'dia' | 'semana' | 'mes'):
   const diaSemana = d.getDay() === 0 ? 6 : d.getDay() - 1; // 0=lunes
   const lunes = new Date(d);
   lunes.setDate(d.getDate() - diaSemana);
-  return lunes.toISOString().split('T')[0];
+  return lunes.toISOString().split('T')[0]!;
 }
 
 export async function topGastos(userId: string, query: TopGastosQuery) {
