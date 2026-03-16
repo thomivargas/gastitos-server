@@ -2,8 +2,11 @@ import Papa from 'papaparse';
 import { prisma } from '@config/database';
 import { NotFoundError, BadRequestError } from '@middlewares/errors';
 import { Decimal, sumar, negar, redondear } from '@utils/decimal';
-import type { Prisma } from '@prisma/client';
-import type { MapeoColumnas, EjecutarImportInput, ExportarQuery } from './importacion.schema';
+import { Prisma } from '@prisma/client';
+import type { MapeoColumnas, EjecutarImportInput, ExportarQuery, EjecutarImportBancarioInput } from './importacion.schema';
+import { esExcel, parsearExcel, parsearFecha, parsearMonto } from './parsers/utils';
+import { obtenerParser, listarParsers as listarParsersRegistry } from './parsers/registro';
+
 
 interface FilaParseada {
   fila: number;
@@ -21,9 +24,18 @@ interface ErrorFila {
 }
 
 /**
- * Parsea un archivo CSV y retorna las primeras filas para preview.
+ * Parsea un archivo (CSV o Excel) y retorna las primeras filas para preview.
  */
 export function preview(buffer: Buffer) {
+  if (esExcel(buffer)) {
+    const { columnas, filas } = parsearExcel(buffer);
+    return {
+      columnas,
+      filas: filas.slice(0, 5),
+      totalFilas: filas.length,
+    };
+  }
+
   const contenido = buffer.toString('utf-8');
   const resultado = Papa.parse(contenido, {
     header: true,
@@ -42,59 +54,6 @@ export function preview(buffer: Buffer) {
   };
 }
 
-/**
- * Parsea una fecha segun el formato especificado.
- */
-function parsearFecha(valor: string, formato: string): Date | null {
-  const limpio = valor.trim();
-  if (!limpio) return null;
-
-  let anio: number, mes: number, dia: number;
-
-  try {
-    if (formato === 'YYYY-MM-DD') {
-      [anio, mes, dia] = limpio.split('-').map(Number) as [number, number, number];
-    } else if (formato === 'DD/MM/YYYY') {
-      [dia, mes, anio] = limpio.split('/').map(Number) as [number, number, number];
-    } else if (formato === 'MM/DD/YYYY') {
-      [mes, dia, anio] = limpio.split('/').map(Number) as [number, number, number];
-    } else if (formato === 'DD-MM-YYYY') {
-      [dia, mes, anio] = limpio.split('-').map(Number) as [number, number, number];
-    } else {
-      return null;
-    }
-  } catch {
-    return null;
-  }
-
-  if (!anio || !mes || !dia || mes < 1 || mes > 12 || dia < 1 || dia > 31) return null;
-
-  const fecha = new Date(anio, mes - 1, dia);
-  if (isNaN(fecha.getTime())) return null;
-  return fecha;
-}
-
-/**
- * Parsea un monto teniendo en cuenta el separador decimal.
- */
-function parsearMonto(valor: string, separadorDecimal: '.' | ','): number | null {
-  let limpio = valor.trim().replace(/\s/g, '');
-
-  // Remover simbolo de moneda comun
-  limpio = limpio.replace(/^[$€£AR$US$]+/i, '').replace(/[$€£]+$/, '');
-
-  if (separadorDecimal === ',') {
-    // Remover puntos de miles, reemplazar coma decimal por punto
-    limpio = limpio.replace(/\./g, '').replace(',', '.');
-  } else {
-    // Remover comas de miles
-    limpio = limpio.replace(/,/g, '');
-  }
-
-  const num = parseFloat(limpio);
-  if (isNaN(num)) return null;
-  return num;
-}
 
 /**
  * Parsea todas las filas del CSV y las valida.
@@ -105,17 +64,21 @@ function parsearFilas(
   formatoFecha: string,
   separadorDecimal: '.' | ',',
 ): { filas: FilaParseada[]; errores: ErrorFila[] } {
-  const contenido = buffer.toString('utf-8');
-  const resultado = Papa.parse(contenido, {
-    header: true,
-    skipEmptyLines: true,
-  });
+  let rawFilas: Record<string, string>[];
+
+  if (esExcel(buffer)) {
+    rawFilas = parsearExcel(buffer).filas;
+  } else {
+    const contenido = buffer.toString('utf-8');
+    const resultado = Papa.parse(contenido, { header: true, skipEmptyLines: true });
+    rawFilas = resultado.data as Record<string, string>[];
+  }
 
   const filas: FilaParseada[] = [];
   const errores: ErrorFila[] = [];
 
-  for (let i = 0; i < resultado.data.length; i++) {
-    const raw = resultado.data[i] as Record<string, string>;
+  for (let i = 0; i < rawFilas.length; i++) {
+    const raw = rawFilas[i]!;
     const numFila = i + 2; // +1 header, +1 base-1
 
     // Fecha
@@ -292,6 +255,151 @@ export async function ejecutar(
     importadas: datosTransacciones.length,
     errores,
     totalFilas: filas.length + errores.length,
+  };
+}
+
+/**
+ * Lista los parsers bancarios disponibles.
+ */
+export function obtenerParsersDisponibles() {
+  return listarParsersRegistry();
+}
+
+/**
+ * Retorna un preview de las transacciones de un archivo bancario (sin importar).
+ */
+export function previewBancario(buffer: Buffer, parserId: string) {
+  const parser = obtenerParser(parserId);
+  if (!parser) throw new BadRequestError(`Parser bancario "${parserId}" no encontrado`);
+  return parser.preview(buffer);
+}
+
+/**
+ * Ejecuta la importacion bancaria.
+ * Separa transacciones por moneda y las asigna a la cuenta correspondiente.
+ */
+export async function ejecutarBancario(
+  usuarioId: string,
+  buffer: Buffer,
+  input: EjecutarImportBancarioInput,
+) {
+  const parser = obtenerParser(input.parserId);
+  if (!parser) throw new BadRequestError(`Parser bancario "${input.parserId}" no encontrado`);
+
+  // Parsear el archivo
+  const { transacciones: todasTransacciones, errores, metadatos } = parser.parsear(buffer);
+
+  // Verificar que las cuentas pertenecen al usuario y obtener su moneda
+  const cuentaIds = Object.values(input.cuentas);
+  const cuentas = await prisma.cuenta.findMany({
+    where: { id: { in: cuentaIds }, usuarioId },
+    select: { id: true, moneda: true },
+  });
+
+  if (cuentas.length !== cuentaIds.length) {
+    throw new NotFoundError('Una o mas cuentas no encontradas');
+  }
+
+  // Mapa de cuentaId -> moneda de la cuenta
+  const cuentaMonedaMap = new Map(cuentas.map((c) => [c.id, c.moneda]));
+
+  // Filtrar cargos bancarios si aplica
+  const transacciones = input.excluirCargosBancarios
+    ? todasTransacciones.filter((t) => !t.excluida)
+    : todasTransacciones;
+
+  const excluidas = todasTransacciones.filter((t) => t.excluida).length;
+
+  if (transacciones.length === 0) {
+    throw new BadRequestError('No hay transacciones validas para importar');
+  }
+
+  // Cargar reglas si aplica
+  let sugerirCategoria: ((uid: string, desc: string) => Promise<{ id: string } | null>) | null = null;
+  if (input.aplicarReglas) {
+    try {
+      const reglaService = await import('../regla/regla.service');
+      sugerirCategoria = reglaService.sugerirCategoria;
+    } catch {
+      // Continuar sin auto-categorizacion
+    }
+  }
+
+  // Cache de categorias
+  const cacheCategorias = new Map<string, string | null>();
+  async function resolverCategoria(desc: string): Promise<string | null> {
+    const key = desc.toLowerCase();
+    if (cacheCategorias.has(key)) return cacheCategorias.get(key)!;
+    let id: string | null = null;
+    if (sugerirCategoria) {
+      const sugerencia = await sugerirCategoria(usuarioId, desc);
+      id = sugerencia?.id ?? null;
+    }
+    cacheCategorias.set(key, id);
+    return id;
+  }
+
+  // Construir datos de transacciones agrupados por cuenta
+  const datosPorCuenta = new Map<string, { datos: Prisma.TransaccionCreateManyInput[]; delta: Prisma.Decimal }>();
+
+  for (const t of transacciones) {
+    const cuentaId = input.cuentas[t.moneda];
+    if (!cuentaId) {
+      // Si no hay cuenta para esta moneda, agregar a errores y continuar
+      errores.push({ fila: 0, error: `Sin cuenta configurada para moneda ${t.moneda}: "${t.descripcion}"` });
+      continue;
+    }
+
+    const monedaCuenta = cuentaMonedaMap.get(cuentaId)!;
+    const categoriaId = await resolverCategoria(t.descripcion);
+    const montoDec = new Decimal(t.monto);
+    const delta = t.tipo === 'INGRESO' ? montoDec : negar(montoDec);
+
+    if (!datosPorCuenta.has(cuentaId)) {
+      datosPorCuenta.set(cuentaId, { datos: [], delta: new Decimal(0) });
+    }
+    const entry = datosPorCuenta.get(cuentaId)!;
+    entry.delta = sumar(entry.delta, delta);
+    entry.datos.push({
+      usuarioId,
+      cuentaId,
+      tipo: t.tipo,
+      monto: t.monto,
+      moneda: monedaCuenta,
+      fecha: t.fecha,
+      descripcion: t.descripcion,
+      categoriaId,
+      notas: t.notas ?? null,
+      excluida: false,
+    });
+  }
+
+  const BATCH_SIZE = 500;
+  let importadas = 0;
+  const porCuenta: Record<string, number> = {};
+
+  await prisma.$transaction(async (tx) => {
+    for (const [cuentaId, { datos, delta }] of datosPorCuenta.entries()) {
+      for (let i = 0; i < datos.length; i += BATCH_SIZE) {
+        await tx.transaccion.createMany({ data: datos.slice(i, i + BATCH_SIZE) });
+      }
+      await tx.cuenta.update({
+        where: { id: cuentaId },
+        data: { balance: { increment: delta } },
+      });
+      importadas += datos.length;
+      const moneda = cuentaMonedaMap.get(cuentaId)!;
+      porCuenta[moneda] = (porCuenta[moneda] ?? 0) + datos.length;
+    }
+  });
+
+  return {
+    importadas,
+    excluidas,
+    errores,
+    totalFilas: metadatos.totalFilas,
+    periodo: metadatos.periodo,
+    porCuenta,
   };
 }
 

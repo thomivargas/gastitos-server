@@ -22,6 +22,23 @@ export const previewSchema = z.object({
   cuentaId: z.string().uuid(),
 });
 
+// Esquema para importacion bancaria (parsers especificos por banco)
+export const ejecutarImportBancarioSchema = z.object({
+  parserId: z.string().min(1, 'Debe especificar un parser bancario'),
+  cuentas: z.record(z.string(), z.string().uuid()).refine(
+    (obj) => Object.keys(obj).length > 0,
+    'Debe seleccionar al menos una cuenta',
+  ),
+  aplicarReglas: z.boolean().default(true),
+  excluirCargosBancarios: z.boolean().default(true),
+});
+
+export type EjecutarImportBancarioInput = z.infer<typeof ejecutarImportBancarioSchema>;
+
+export const previewBancarioSchema = z.object({
+  parserId: z.string().min(1),
+});
+
 export const exportarQuerySchema = z.object({
   cuentaId: z.string().uuid().optional(),
   fechaDesde: z.string().date().optional(),
