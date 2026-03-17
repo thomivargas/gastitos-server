@@ -342,14 +342,14 @@ export async function ejecutarBancario(
   for (const t of transacciones) {
     const categoriaId = await resolverCategoria(t.descripcion);
 
-    let montoFinal: Decimal;
+    let montoFinal: Prisma.Decimal;
     let montoOriginal: number | null = null;
     let monedaOriginal: string | null = null;
     let tasaCambio: number | null = null;
 
     if (t.moneda === 'USD') {
       const tasa = await obtenerTasa('USD', 'ARS', input.tipoCambioUsd, t.fecha);
-      montoFinal = redondear(multiplicar(new Decimal(t.monto), new Decimal(tasa)), 4);
+      montoFinal = new Decimal(redondear(multiplicar(new Decimal(t.monto), new Decimal(tasa)), 4));
       montoOriginal = t.monto;
       monedaOriginal = 'USD';
       tasaCambio = tasa;
