@@ -19,11 +19,18 @@ enum TipoCuenta {
   EFECTIVO
   BANCO_CORRIENTE
   BANCO_AHORRO
+  BILLETERA_VIRTUAL
   TARJETA_CREDITO
   INVERSION
   PRESTAMO
   OTRO_ACTIVO
   OTRO_PASIVO
+}
+
+enum TipoInstitucion {
+  BANCO
+  BILLETERA_VIRTUAL
+  OTRA
 }
 
 enum ClasificacionCuenta {
@@ -87,6 +94,7 @@ model Usuario {
   transaccionesRecurrentes TransaccionRecurrente[]
   reglasCategorizacion     ReglaCategorizacion[]
   sesiones                 Sesion[]
+  instituciones            Institucion[]
 
   @@map("usuarios")
 }
@@ -108,7 +116,7 @@ model Cuenta {
   moneda        String              @default("ARS")
   balance       Decimal             @default(0) @db.Decimal(19, 4)
   estado        EstadoCuenta        @default(ACTIVA)
-  institucion   String? // nombre del banco o institucion financiera
+  institucionId String?             @map("institucion_id")
   color         String              @default("#6172F3")
   icono         String              @default("wallet")
   notas         String?
@@ -118,6 +126,7 @@ model Cuenta {
   actualizadoEl DateTime            @updatedAt @map("actualizado_el")
 
   usuario                  Usuario                @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  institucion              Institucion?           @relation(fields: [institucionId], references: [id])
   transacciones            Transaccion[]
   balancesHistoricos       BalanceHistorico[]
   transferenciasOrigen     Transferencia[]        @relation("CuentaOrigen")
@@ -127,6 +136,30 @@ model Cuenta {
   @@index([usuarioId, estado])
   @@index([usuarioId, tipo])
   @@map("cuentas")
+}
+
+// ============================================================================
+// INSTITUCIONES
+// ============================================================================
+// Bancos, billeteras virtuales y otras instituciones financieras.
+// Pueden ser oficiales (predefinidas) o personalizadas por usuario.
+
+model Institucion {
+  id        String          @id @default(uuid())
+  nombre    String
+  tipo      TipoInstitucion @default(BANCO)
+  color     String          @default("#6172F3")
+  icono     String          @default("landmark")
+  oficial   Boolean         @default(false)
+  usuarioId String?         @map("usuario_id")
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  cuentas Cuenta[]
+
+  @@index([oficial])
+  @@index([usuarioId])
+  @@index([nombre])
+  @@map("instituciones")
 }
 
 // ============================================================================
@@ -200,6 +233,8 @@ model Transaccion {
   notas         String?
   excluida      Boolean         @default(false) // excluir de reportes/presupuestos
   tasaCambio    Decimal?        @map("tasa_cambio") @db.Decimal(19, 10) // tasa usada si moneda != cuenta.moneda
+  montoOriginal  Decimal?       @map("monto_original") @db.Decimal(19, 4)
+  monedaOriginal String?        @map("moneda_original")
   creadoEl      DateTime        @default(now()) @map("creado_el")
   actualizadoEl DateTime        @updatedAt @map("actualizado_el")
 

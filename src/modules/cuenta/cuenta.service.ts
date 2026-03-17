@@ -20,13 +20,15 @@ const selectCuenta = {
   moneda: true,
   balance: true,
   estado: true,
-  institucion: true,
   color: true,
   icono: true,
   notas: true,
   detalles: true,
   creadoEl: true,
   actualizadoEl: true,
+  institucion: {
+    select: { id: true, nombre: true, tipo: true, color: true, icono: true },
+  },
 } as const;
 
 export async function crear(usuarioId: string, data: CrearCuentaInput) {
@@ -40,7 +42,7 @@ export async function crear(usuarioId: string, data: CrearCuentaInput) {
       clasificacion,
       moneda: data.moneda ?? 'ARS',
       balance: data.balanceInicial ?? 0,
-      institucion: data.institucion ?? null,
+      institucionId: data.institucionId ?? null,
       ...(data.color !== undefined && { color: data.color }),
       ...(data.icono !== undefined && { icono: data.icono }),
       notas: data.notas ?? null,
@@ -89,7 +91,7 @@ export async function actualizar(usuarioId: string, cuentaId: string, data: Actu
     data: {
       ...(data.nombre !== undefined && { nombre: data.nombre }),
       ...(data.moneda !== undefined && { moneda: data.moneda }),
-      ...(data.institucion !== undefined && { institucion: data.institucion }),
+      ...(data.institucionId !== undefined && { institucionId: data.institucionId }),
       ...(data.color !== undefined && { color: data.color }),
       ...(data.icono !== undefined && { icono: data.icono }),
       ...(data.notas !== undefined && { notas: data.notas }),

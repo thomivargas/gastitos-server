@@ -25,10 +25,8 @@ export const previewSchema = z.object({
 // Esquema para importacion bancaria (parsers especificos por banco)
 export const ejecutarImportBancarioSchema = z.object({
   parserId: z.string().min(1, 'Debe especificar un parser bancario'),
-  cuentas: z.record(z.string(), z.string().uuid()).refine(
-    (obj) => Object.keys(obj).length > 0,
-    'Debe seleccionar al menos una cuenta',
-  ),
+  cuentaId: z.string().uuid('Debe seleccionar una cuenta'),
+  tipoCambioUsd: z.enum(['tarjeta', 'blue', 'mep', 'oficial']).default('tarjeta'),
   aplicarReglas: z.boolean().default(true),
   excluirCargosBancarios: z.boolean().default(true),
   fechaResumen: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD requerido').optional(),

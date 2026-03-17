@@ -1,11 +1,12 @@
 import Papa from 'papaparse';
 import { prisma } from '@config/database';
 import { NotFoundError, BadRequestError } from '@middlewares/errors';
-import { Decimal, sumar, negar, redondear } from '@utils/decimal';
+import { Decimal, sumar, negar, redondear, multiplicar } from '@utils/decimal';
 import { Prisma } from '@prisma/client';
 import type { MapeoColumnas, EjecutarImportInput, EjecutarImportBancarioInput } from './importacion.schema';
 import { esExcel, parsearExcel, parsearFecha, parsearMonto } from './parsers/utils';
 import { obtenerParser, listarParsers as listarParsersRegistry } from './parsers/registro';
+import { obtenerTasa } from '@modules/moneda/moneda.service';
 
 
 interface FilaParseada {
@@ -276,7 +277,8 @@ export function previewBancario(buffer: Buffer, parserId: string) {
 
 /**
  * Ejecuta la importacion bancaria.
- * Separa transacciones por moneda y las asigna a la cuenta correspondiente.
+ * Convierte transacciones en USD a ARS usando la cotizacion indicada
+ * y las importa todas en una sola cuenta.
  */
 export async function ejecutarBancario(
   usuarioId: string,
@@ -290,19 +292,12 @@ export async function ejecutarBancario(
   const opciones = input.fechaResumen ? { fechaResumen: new Date(input.fechaResumen) } : undefined;
   const { transacciones: todasTransacciones, errores, metadatos } = parser.parsear(buffer, opciones);
 
-  // Verificar que las cuentas pertenecen al usuario y obtener su moneda
-  const cuentaIds = Object.values(input.cuentas);
-  const cuentas = await prisma.cuenta.findMany({
-    where: { id: { in: cuentaIds }, usuarioId },
+  // Verificar que la cuenta pertenece al usuario
+  const cuenta = await prisma.cuenta.findFirst({
+    where: { id: input.cuentaId, usuarioId },
     select: { id: true, moneda: true },
   });
-
-  if (cuentas.length !== cuentaIds.length) {
-    throw new NotFoundError('Una o mas cuentas no encontradas');
-  }
-
-  // Mapa de cuentaId -> moneda de la cuenta
-  const cuentaMonedaMap = new Map(cuentas.map((c) => [c.id, c.moneda]));
+  if (!cuenta) throw new NotFoundError('Cuenta');
 
   // Filtrar cargos bancarios si aplica
   const transacciones = input.excluirCargosBancarios
@@ -340,67 +335,68 @@ export async function ejecutarBancario(
     return id;
   }
 
-  // Construir datos de transacciones agrupados por cuenta
-  const datosPorCuenta = new Map<string, { datos: Prisma.TransaccionCreateManyInput[]; delta: Prisma.Decimal }>();
+  const datos: Prisma.TransaccionCreateManyInput[] = [];
+  let balanceDelta = new Decimal(0);
+  let convertidas = 0;
 
   for (const t of transacciones) {
-    const cuentaId = input.cuentas[t.moneda];
-    if (!cuentaId) {
-      // Si no hay cuenta para esta moneda, agregar a errores y continuar
-      errores.push({ fila: 0, error: `Sin cuenta configurada para moneda ${t.moneda}: "${t.descripcion}"` });
-      continue;
-    }
-
-    const monedaCuenta = cuentaMonedaMap.get(cuentaId)!;
     const categoriaId = await resolverCategoria(t.descripcion);
-    const montoDec = new Decimal(t.monto);
-    const delta = t.tipo === 'INGRESO' ? montoDec : negar(montoDec);
 
-    if (!datosPorCuenta.has(cuentaId)) {
-      datosPorCuenta.set(cuentaId, { datos: [], delta: new Decimal(0) });
+    let montoFinal: Decimal;
+    let montoOriginal: number | null = null;
+    let monedaOriginal: string | null = null;
+    let tasaCambio: number | null = null;
+
+    if (t.moneda === 'USD') {
+      const tasa = await obtenerTasa('USD', 'ARS', input.tipoCambioUsd, t.fecha);
+      montoFinal = redondear(multiplicar(new Decimal(t.monto), new Decimal(tasa)), 4);
+      montoOriginal = t.monto;
+      monedaOriginal = 'USD';
+      tasaCambio = tasa;
+      convertidas++;
+    } else {
+      montoFinal = new Decimal(t.monto);
     }
-    const entry = datosPorCuenta.get(cuentaId)!;
-    entry.delta = sumar(entry.delta, delta);
-    entry.datos.push({
+
+    const delta = t.tipo === 'INGRESO' ? montoFinal : negar(montoFinal);
+    balanceDelta = sumar(balanceDelta, delta);
+
+    datos.push({
       usuarioId,
-      cuentaId,
+      cuentaId: input.cuentaId,
       tipo: t.tipo,
-      monto: t.monto,
-      moneda: monedaCuenta,
+      monto: montoFinal,
+      moneda: cuenta.moneda,
       fecha: t.fecha,
       descripcion: t.descripcion,
       categoriaId,
       notas: t.notas ?? null,
       excluida: false,
+      montoOriginal,
+      monedaOriginal,
+      tasaCambio,
     });
   }
 
   const BATCH_SIZE = 500;
-  let importadas = 0;
-  const porCuenta: Record<string, number> = {};
 
   await prisma.$transaction(async (tx) => {
-    for (const [cuentaId, { datos, delta }] of datosPorCuenta.entries()) {
-      for (let i = 0; i < datos.length; i += BATCH_SIZE) {
-        await tx.transaccion.createMany({ data: datos.slice(i, i + BATCH_SIZE) });
-      }
-      await tx.cuenta.update({
-        where: { id: cuentaId },
-        data: { balance: { increment: delta } },
-      });
-      importadas += datos.length;
-      const moneda = cuentaMonedaMap.get(cuentaId)!;
-      porCuenta[moneda] = (porCuenta[moneda] ?? 0) + datos.length;
+    for (let i = 0; i < datos.length; i += BATCH_SIZE) {
+      await tx.transaccion.createMany({ data: datos.slice(i, i + BATCH_SIZE) });
     }
+    await tx.cuenta.update({
+      where: { id: input.cuentaId },
+      data: { balance: { increment: balanceDelta } },
+    });
   });
 
   return {
-    importadas,
+    importadas: datos.length,
     excluidas,
     errores,
     totalFilas: metadatos.totalFilas,
     periodo: metadatos.periodo,
-    porCuenta,
+    convertidas,
   };
 }
 

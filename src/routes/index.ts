@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { 
+import {
   authRoutes,
   adminRoutes,
   balanceRoutes,
@@ -7,6 +7,7 @@ import {
   cuentaRoutes,
   etiquetaRoutes,
   importacionRoutes,
+  institucionRoutes,
   monedaRoutes,
   presupuestoRoutes,
   recurrenteRoutes,
@@ -30,6 +31,7 @@ router.use(`/presupuestos`, presupuestoRoutes);
 router.use(`/recurrentes`, recurrenteRoutes);
 router.use(`/balances`, balanceRoutes);
 router.use(`/reportes`, reporteRoutes);
+router.use(`/instituciones`, institucionRoutes);
 router.use(`/monedas`, monedaRoutes);
 router.use(`/importacion`, importacionRoutes);
 router.use(`/reglas`, reglaRoutes);

@@ -14,6 +14,8 @@ export const crearTransaccionSchema = z.object({
   notas: z.string().max(500).optional(),
   etiquetaIds: z.array(z.string().uuid()).optional(),
   excluida: z.boolean().optional(),
+  montoOriginal: z.number().positive().optional(),
+  monedaOriginal: z.string().length(3).toUpperCase().optional(),
 });
 
 export const actualizarTransaccionSchema = z.object({
@@ -26,6 +28,8 @@ export const actualizarTransaccionSchema = z.object({
   notas: z.string().max(500).nullable().optional(),
   etiquetaIds: z.array(z.string().uuid()).optional(),
   excluida: z.boolean().optional(),
+  montoOriginal: z.number().positive().nullable().optional(),
+  monedaOriginal: z.string().length(3).toUpperCase().nullable().optional(),
 });
 
 export const listaTransaccionQuerySchema = paginationSchema.extend({

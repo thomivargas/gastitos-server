@@ -12,6 +12,7 @@ const DOLAR_TIPOS = {
   blue: 'blue',
   mep: 'bolsa',
   oficial: 'oficial',
+  tarjeta: 'tarjeta',
 } as const;
 
 interface DolarApiResponse {
@@ -140,7 +141,7 @@ export async function obtenerTasasDelDia() {
 export async function obtenerTasa(
   monedaOrigen: string,
   monedaDestino: string,
-  tipo: 'blue' | 'mep' | 'oficial' = 'blue',
+  tipo: 'blue' | 'mep' | 'oficial' | 'tarjeta' = 'blue',
   fecha?: Date
 ): Promise<number> {
   const fechaBusqueda = fecha ?? hoyUTC();

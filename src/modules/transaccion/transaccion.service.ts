@@ -28,6 +28,8 @@ const selectTransaccion = {
   descripcion: true,
   notas: true,
   excluida: true,
+  montoOriginal: true,
+  monedaOriginal: true,
   creadoEl: true,
   actualizadoEl: true,
   cuenta: { select: { id: true, nombre: true, tipo: true } },
@@ -103,6 +105,8 @@ export async function crear(usuarioId: string, data: CrearTransaccionInput) {
         categoriaId: categoriaId ?? null,
         notas: data.notas ?? null,
         ...(data.excluida !== undefined && { excluida: data.excluida }),
+        montoOriginal: data.montoOriginal ?? null,
+        monedaOriginal: data.monedaOriginal ?? null,
       },
       select: selectTransaccion,
     });
@@ -241,6 +245,8 @@ export async function actualizar(
         ...(data.categoriaId !== undefined && { categoriaId: data.categoriaId }),
         ...(data.notas !== undefined && { notas: data.notas }),
         ...(data.excluida !== undefined && { excluida: data.excluida }),
+        ...(data.montoOriginal !== undefined && { montoOriginal: data.montoOriginal }),
+        ...(data.monedaOriginal !== undefined && { monedaOriginal: data.monedaOriginal }),
       },
       select: selectTransaccion,
     });
