@@ -31,6 +31,13 @@ export const topGastosQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
 });
 
+export const exportarQuerySchema = z.object({
+  cuentaId: z.string().uuid().optional(),
+  fechaDesde: z.string().regex(fechaRegex, 'Formato YYYY-MM-DD requerido').optional(),
+  fechaHasta: z.string().regex(fechaRegex, 'Formato YYYY-MM-DD requerido').optional(),
+});
+export type ExportarQuery = z.infer<typeof exportarQuerySchema>;
+
 export type ResumenMensualQuery = z.infer<typeof resumenMensualQuerySchema>;
 export type RangoFechaQuery = z.infer<typeof rangoFechaQuerySchema>;
 export type TendenciaMensualQuery = z.infer<typeof tendenciaMensualQuerySchema>;

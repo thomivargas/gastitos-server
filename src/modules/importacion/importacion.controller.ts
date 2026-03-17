@@ -1,8 +1,6 @@
 import { asyncHandler } from '@utils/asyncHandler';
-import { typedQuery } from '@middlewares/validate.middleware';
 import { BadRequestError } from '@middlewares/errors';
 import { ejecutarImportSchema, ejecutarImportBancarioSchema, previewBancarioSchema } from './importacion.schema';
-import type { ExportarQuery } from './importacion.schema';
 import * as importService from './importacion.service';
 
 export const previewCSV = asyncHandler(async (req, res) => {
@@ -25,20 +23,6 @@ export const ejecutarImport = asyncHandler(async (req, res) => {
   const config = ejecutarImportSchema.parse(rawConfig);
   const resultado = await importService.ejecutar(req.user!.sub, req.file.buffer, config);
   res.json({ status: 'ok', data: resultado });
-});
-
-export const exportarCSV = asyncHandler(async (req, res) => {
-  const csv = await importService.exportar(req.user!.sub, typedQuery<ExportarQuery>(req));
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="gastitos-export.csv"');
-  res.send(csv);
-});
-
-export const descargarPlantilla = asyncHandler(async (_req, res) => {
-  const csv = importService.plantilla();
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="gastitos-plantilla.csv"');
-  res.send(csv);
 });
 
 export const listarParsers = asyncHandler(async (_req, res) => {

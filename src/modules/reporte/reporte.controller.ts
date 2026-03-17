@@ -7,6 +7,7 @@ import type {
   TendenciaMensualQuery,
   FlujoCajaQuery,
   TopGastosQuery,
+  ExportarQuery,
 } from './reporte.schema';
 
 export const resumenMensual = asyncHandler(async (req, res) => {
@@ -37,4 +38,18 @@ export const flujoDeCaja = asyncHandler(async (req, res) => {
 export const topGastos = asyncHandler(async (req, res) => {
   const data = await reporteService.topGastos(req.user!.sub, typedQuery<TopGastosQuery>(req));
   res.json({ status: 'ok', data });
+});
+
+export const exportarCSV = asyncHandler(async (req, res) => {
+  const csv = await reporteService.exportar(req.user!.sub, typedQuery<ExportarQuery>(req));
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="gastitos-export.csv"');
+  res.send(csv);
+});
+
+export const descargarPlantilla = asyncHandler(async (_req, res) => {
+  const csv = reporteService.plantilla();
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="gastitos-plantilla.csv"');
+  res.send(csv);
 });

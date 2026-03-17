@@ -3,7 +3,7 @@ import { prisma } from '@config/database';
 import { NotFoundError, BadRequestError } from '@middlewares/errors';
 import { Decimal, sumar, negar, redondear } from '@utils/decimal';
 import { Prisma } from '@prisma/client';
-import type { MapeoColumnas, EjecutarImportInput, ExportarQuery, EjecutarImportBancarioInput } from './importacion.schema';
+import type { MapeoColumnas, EjecutarImportInput, EjecutarImportBancarioInput } from './importacion.schema';
 import { esExcel, parsearExcel, parsearFecha, parsearMonto } from './parsers/utils';
 import { obtenerParser, listarParsers as listarParsersRegistry } from './parsers/registro';
 
@@ -403,77 +403,3 @@ export async function ejecutarBancario(
   };
 }
 
-/**
- * Exporta transacciones del usuario a formato CSV.
- * Usa cursor-based pagination para evitar cargar todo en memoria.
- */
-export async function exportar(usuarioId: string, query: ExportarQuery): Promise<string> {
-  const where: Prisma.TransaccionWhereInput = { usuarioId };
-
-  if (query.cuentaId) where.cuentaId = query.cuentaId;
-  if (query.fechaDesde || query.fechaHasta) {
-    where.fecha = {};
-    if (query.fechaDesde) where.fecha.gte = new Date(query.fechaDesde);
-    if (query.fechaHasta) where.fecha.lte = new Date(query.fechaHasta);
-  }
-
-  const PAGE_SIZE = 1000;
-  const datos: Array<Record<string, unknown>> = [];
-  let cursor: string | undefined;
-
-  // Paginar con cursor para no cargar todo en memoria de golpe
-  while (true) {
-    const batch = await prisma.transaccion.findMany({
-      where,
-      select: {
-        id: true,
-        fecha: true,
-        tipo: true,
-        monto: true,
-        moneda: true,
-        descripcion: true,
-        notas: true,
-        excluida: true,
-        cuenta: { select: { nombre: true } },
-        categoria: { select: { nombre: true } },
-      },
-      orderBy: { fecha: 'asc' },
-      take: PAGE_SIZE,
-      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-    });
-
-    if (batch.length === 0) break;
-
-    for (const t of batch) {
-      datos.push({
-        fecha: t.fecha.toISOString().split('T')[0],
-        tipo: t.tipo,
-        monto: redondear(t.monto),
-        moneda: t.moneda,
-        descripcion: t.descripcion,
-        categoria: t.categoria?.nombre ?? '',
-        cuenta: t.cuenta.nombre,
-        notas: t.notas ?? '',
-        excluida: t.excluida ? 'si' : 'no',
-      });
-    }
-
-    cursor = batch[batch.length - 1]!.id;
-    if (batch.length < PAGE_SIZE) break;
-  }
-
-  return Papa.unparse(datos);
-}
-
-/**
- * Genera un CSV plantilla con las columnas esperadas.
- */
-export function plantilla(): string {
-  return Papa.unparse({
-    fields: ['fecha', 'tipo', 'monto', 'descripcion', 'categoria', 'notas'],
-    data: [
-      ['2025-01-15', 'GASTO', '1500.50', 'Supermercado', 'Alimentacion', ''],
-      ['2025-01-16', 'INGRESO', '50000', 'Sueldo enero', 'Salario', 'Deposito bancario'],
-    ],
-  });
-}

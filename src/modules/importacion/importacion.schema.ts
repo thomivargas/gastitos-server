@@ -39,12 +39,5 @@ export const previewBancarioSchema = z.object({
   parserId: z.string().min(1),
 });
 
-export const exportarQuerySchema = z.object({
-  cuentaId: z.string().uuid().optional(),
-  fechaDesde: z.string().date().optional(),
-  fechaHasta: z.string().date().optional(),
-});
-
 export type MapeoColumnas = z.infer<typeof mapeoColumnasSchema>;
 export type EjecutarImportInput = z.infer<typeof ejecutarImportSchema>;
-export type ExportarQuery = z.infer<typeof exportarQuerySchema>;

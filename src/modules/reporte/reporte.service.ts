@@ -1,3 +1,4 @@
+import Papa from 'papaparse';
 import { prisma } from '@config/database';
 import { Decimal, sumar, multiplicar, redondear } from '@utils/decimal';
 import type { Prisma } from '@prisma/client';
@@ -8,6 +9,7 @@ import type {
   tendenciaMensualQuerySchema,
   flujoCajaQuerySchema,
   topGastosQuerySchema,
+  exportarQuerySchema,
 } from './reporte.schema';
 
 type ResumenMensualQuery = z.infer<typeof resumenMensualQuerySchema>;
@@ -15,6 +17,7 @@ type RangoFechaQuery = z.infer<typeof rangoFechaQuerySchema>;
 type TendenciaMensualQuery = z.infer<typeof tendenciaMensualQuerySchema>;
 type FlujoCajaQuery = z.infer<typeof flujoCajaQuerySchema>;
 type TopGastosQuery = z.infer<typeof topGastosQuerySchema>;
+type ExportarQuery = z.infer<typeof exportarQuerySchema>;
 
 function rangoDelMes(anio: number, mes: number) {
   const desde = new Date(anio, mes - 1, 1);
@@ -357,4 +360,71 @@ export async function topGastos(userId: string, query: TopGastosQuery) {
       monto: redondear(t.monto),
     })),
   };
+}
+
+export async function exportar(usuarioId: string, query: ExportarQuery): Promise<string> {
+  const where: Prisma.TransaccionWhereInput = { usuarioId };
+
+  if (query.cuentaId) where.cuentaId = query.cuentaId;
+  if (query.fechaDesde || query.fechaHasta) {
+    where.fecha = {};
+    if (query.fechaDesde) where.fecha.gte = new Date(query.fechaDesde);
+    if (query.fechaHasta) where.fecha.lte = new Date(query.fechaHasta);
+  }
+
+  const PAGE_SIZE = 1000;
+  const datos: Array<Record<string, unknown>> = [];
+  let cursor: string | undefined;
+
+  while (true) {
+    const batch = await prisma.transaccion.findMany({
+      where,
+      select: {
+        id: true,
+        fecha: true,
+        tipo: true,
+        monto: true,
+        moneda: true,
+        descripcion: true,
+        notas: true,
+        excluida: true,
+        cuenta: { select: { nombre: true } },
+        categoria: { select: { nombre: true } },
+      },
+      orderBy: { fecha: 'asc' },
+      take: PAGE_SIZE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+    });
+
+    if (batch.length === 0) break;
+
+    for (const t of batch) {
+      datos.push({
+        fecha: t.fecha.toISOString().split('T')[0],
+        tipo: t.tipo,
+        monto: redondear(t.monto),
+        moneda: t.moneda,
+        descripcion: t.descripcion,
+        categoria: t.categoria?.nombre ?? '',
+        cuenta: t.cuenta.nombre,
+        notas: t.notas ?? '',
+        excluida: t.excluida ? 'si' : 'no',
+      });
+    }
+
+    cursor = batch[batch.length - 1]!.id;
+    if (batch.length < PAGE_SIZE) break;
+  }
+
+  return Papa.unparse(datos);
+}
+
+export function plantilla(): string {
+  return Papa.unparse({
+    fields: ['fecha', 'tipo', 'monto', 'descripcion', 'categoria', 'notas'],
+    data: [
+      ['2025-01-15', 'GASTO', '1500.50', 'Supermercado', 'Alimentacion', ''],
+      ['2025-01-16', 'INGRESO', '50000', 'Sueldo enero', 'Salario', 'Deposito bancario'],
+    ],
+  });
 }

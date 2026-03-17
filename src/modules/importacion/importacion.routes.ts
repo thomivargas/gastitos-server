@@ -1,8 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { authenticate } from '@middlewares/auth.middleware';
-import { validate } from '@middlewares/validate.middleware';
-import { exportarQuerySchema } from './importacion.schema';
 import * as controller from './importacion.controller';
 
 const TIPOS_PERMITIDOS = [
@@ -35,8 +33,6 @@ router.use(authenticate);
 
 router.post('/preview', upload.single('archivo'), controller.previewCSV);
 router.post('/ejecutar', upload.single('archivo'), controller.ejecutarImport);
-router.get('/exportar', validate(exportarQuerySchema, 'query'), controller.exportarCSV);
-router.get('/plantilla', controller.descargarPlantilla);
 
 // Rutas bancarias
 router.get('/parsers', controller.listarParsers);
