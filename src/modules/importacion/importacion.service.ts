@@ -287,7 +287,8 @@ export async function ejecutarBancario(
   if (!parser) throw new BadRequestError(`Parser bancario "${input.parserId}" no encontrado`);
 
   // Parsear el archivo
-  const { transacciones: todasTransacciones, errores, metadatos } = parser.parsear(buffer);
+  const opciones = input.fechaResumen ? { fechaResumen: new Date(input.fechaResumen) } : undefined;
+  const { transacciones: todasTransacciones, errores, metadatos } = parser.parsear(buffer, opciones);
 
   // Verificar que las cuentas pertenecen al usuario y obtener su moneda
   const cuentaIds = Object.values(input.cuentas);

@@ -32,11 +32,15 @@ export interface PreviewBancario {
   totalTransacciones: number;
 }
 
+export interface OpcionesParser {
+  fechaResumen?: Date; // fecha del período del resumen bancario (para cuotas)
+}
+
 export interface ParserBancario {
   id: string;             // 'bbva-tc'
   nombre: string;         // 'BBVA Tarjeta de Credito'
   banco: string;          // 'BBVA'
   tipoArchivo: string[];  // ['.xls', '.xlsx']
-  preview(buffer: Buffer): PreviewBancario;
-  parsear(buffer: Buffer): ResultadoParseo;
+  preview(buffer: Buffer, opciones?: OpcionesParser): PreviewBancario;
+  parsear(buffer: Buffer, opciones?: OpcionesParser): ResultadoParseo;
 }

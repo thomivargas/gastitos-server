@@ -1,5 +1,5 @@
 import { parsearExcel, parsearFecha, parsearMonto } from './utils';
-import type { ParserBancario, TransaccionParseada, ResultadoParseo, PreviewBancario, MetadatosParseo } from './types';
+import type { ParserBancario, OpcionesParser, TransaccionParseada, ResultadoParseo, PreviewBancario, MetadatosParseo } from './types';
 
 // Patrones de cargos bancarios que se marcan como excluidos
 const PATRON_CARGO_BANCARIO =
@@ -36,7 +36,7 @@ function extraerPeriodo(nombreHoja: string, transacciones: TransaccionParseada[]
   return undefined;
 }
 
-function parsearFilasBBVA(buffer: Buffer): { transacciones: TransaccionParseada[]; errores: { fila: number; error: string }[]; nombreHoja: string; totalFilas: number } {
+function parsearFilasBBVA(buffer: Buffer, opciones?: OpcionesParser): { transacciones: TransaccionParseada[]; errores: { fila: number; error: string }[]; nombreHoja: string; totalFilas: number } {
   const { filas, nombreHoja } = parsearExcel(buffer);
   const transacciones: TransaccionParseada[] = [];
   const errores: { fila: number; error: string }[] = [];
@@ -97,13 +97,20 @@ function parsearFilasBBVA(buffer: Buffer): { transacciones: TransaccionParseada[
 
     // Parsear cuotas: "2/3" → notas: "Cuota 2/3", "/" → null
     let notas: string | null = null;
+    let fechaFinal = fecha;
     const matchCuota = cuotaRaw.match(/^(\d+)\/(\d+)$/);
     if (matchCuota) {
-      notas = `Cuota ${matchCuota[1]}/${matchCuota[2]}`;
+      const cuotaTexto = `Cuota ${matchCuota[1]}/${matchCuota[2]}`;
+      if (opciones?.fechaResumen) {
+        notas = `${cuotaTexto} (compra: ${fechaRaw})`;
+        fechaFinal = opciones.fechaResumen;
+      } else {
+        notas = cuotaTexto;
+      }
     }
 
     transacciones.push({
-      fecha,
+      fecha: fechaFinal,
       monto: Math.abs(monto),
       tipo: 'GASTO',
       descripcion: establecimiento.substring(0, 200),
@@ -122,8 +129,8 @@ export const bbvaTcParser: ParserBancario = {
   banco: 'BBVA',
   tipoArchivo: ['.xls', '.xlsx'],
 
-  preview(buffer: Buffer): PreviewBancario {
-    const { transacciones, errores, nombreHoja, totalFilas } = parsearFilasBBVA(buffer);
+  preview(buffer: Buffer, opciones?: OpcionesParser): PreviewBancario {
+    const { transacciones, errores, nombreHoja, totalFilas } = parsearFilasBBVA(buffer, opciones);
     const filasExcluidas = transacciones.filter((t) => t.excluida).length;
 
     const periodo = extraerPeriodo(nombreHoja, transacciones);
@@ -141,8 +148,8 @@ export const bbvaTcParser: ParserBancario = {
     };
   },
 
-  parsear(buffer: Buffer): ResultadoParseo {
-    const { transacciones, errores, nombreHoja, totalFilas } = parsearFilasBBVA(buffer);
+  parsear(buffer: Buffer, opciones?: OpcionesParser): ResultadoParseo {
+    const { transacciones, errores, nombreHoja, totalFilas } = parsearFilasBBVA(buffer, opciones);
     const filasExcluidas = transacciones.filter((t) => t.excluida).length;
     const periodo = extraerPeriodo(nombreHoja, transacciones);
 

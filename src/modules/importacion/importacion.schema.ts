@@ -31,6 +31,7 @@ export const ejecutarImportBancarioSchema = z.object({
   ),
   aplicarReglas: z.boolean().default(true),
   excluirCargosBancarios: z.boolean().default(true),
+  fechaResumen: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD requerido').optional(),
 });
 
 export type EjecutarImportBancarioInput = z.infer<typeof ejecutarImportBancarioSchema>;
