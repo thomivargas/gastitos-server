@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(curl:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzZDVhNWE0Mi04YTQ0LTQwNDQtYmRjYi1kYTRlZmVkNGNlMDQiLCJlbWFpbCI6InRodmFyZ2FzMjNAZ21haWwuY29tIiwicm9sZSI6IlVTVUFSSU8iLCJpYXQiOjE3NzM1OTU1ODQsImV4cCI6MTc3MzU5NjQ4NH0.PjDX2LvHZxXUhPlsjpfOGOdlh9Cbxt6RjA_ribdJZeg\" && echo \"=== LISTAR CUENTAS ===\" && curl -s https://gastitos-server-production.up.railway.app/api/cuentas \\\\\n  -H \"Authorization: Bearer $TOKEN\" | python3 -m json.tool 2>/dev/null || curl -s https://gastitos-server-production.up.railway.app/api/cuentas \\\\\n  -H \"Authorization: Bearer $TOKEN\")",
+      "Bash(npx prisma:*)"
     ]
   }
 }
