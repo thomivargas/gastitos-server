@@ -46,10 +46,3 @@ export const exportarCSV = asyncHandler(async (req, res) => {
   res.setHeader('Content-Disposition', 'attachment; filename="gastitos-export.csv"');
   res.send(csv);
 });
-
-export const descargarPlantilla = asyncHandler(async (_req, res) => {
-  const csv = reporteService.plantilla();
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="gastitos-plantilla.csv"');
-  res.send(csv);
-});

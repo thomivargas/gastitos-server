@@ -22,6 +22,5 @@ router.get('/tendencia-mensual', validate(tendenciaMensualQuerySchema, 'query'),
 router.get('/flujo-de-caja', validate(flujoCajaQuerySchema, 'query'), controller.flujoDeCaja);
 router.get('/top-gastos', validate(topGastosQuerySchema, 'query'), controller.topGastos);
 router.get('/exportar', validate(exportarQuerySchema, 'query'), controller.exportarCSV);
-router.get('/plantilla', controller.descargarPlantilla);
 
 export const reporteRoutes = router;

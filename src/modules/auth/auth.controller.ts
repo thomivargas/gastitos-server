@@ -1,5 +1,6 @@
 import { asyncHandler } from '@utils/asyncHandler';
 import { env } from '@config/env';
+import { logger } from '@config/logger';
 import * as authService from './auth.service';
 
 const COOKIE_NAME = 'gastitos_rt';
@@ -169,7 +170,8 @@ export const googleCallback = asyncHandler(async (req, res) => {
     // Pasar datos al frontend en la URL para que la pestaña los lea y cierre
     const u = Buffer.from(JSON.stringify(resultado.usuario)).toString('base64');
     res.redirect(`${env.CORS_ORIGIN}/auth/google/exito?token=${resultado.accessToken}&u=${encodeURIComponent(u)}`);
-  } catch {
+  } catch (err) {
+    logger.error(err, 'Error en googleCallback');
     res.redirect(errorRedirect);
   }
 });

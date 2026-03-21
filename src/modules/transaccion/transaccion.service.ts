@@ -226,17 +226,27 @@ export async function actualizar(
 
   const nuevoTipo = data.tipo ?? actual.tipo;
   const nuevoMonto = data.monto ?? actual.monto;
+  const nuevaCuentaId = data.cuentaId ?? actual.cuentaId;
+  const cambiaCuenta = data.cuentaId !== undefined && data.cuentaId !== actual.cuentaId;
 
-  // Calcular diferencia: revertir delta anterior + aplicar nuevo
+  // Verificar que la nueva cuenta exista y pertenezca al usuario
+  if (cambiaCuenta) {
+    const cuenta = await prisma.cuenta.findFirst({
+      where: { id: data.cuentaId, usuarioId },
+      select: { id: true },
+    });
+    if (!cuenta) throw new NotFoundError('Cuenta');
+  }
+
   const deltaAnterior = calcularDelta(actual.tipo, actual.monto);
   const deltaNuevo = calcularDelta(nuevoTipo, nuevoMonto);
-  const diferencia = restar(deltaNuevo, deltaAnterior);
 
   const resultado = await prisma.$transaction(async (tx) => {
     // Actualizar transaccion
     const transaccion = await tx.transaccion.update({
       where: { id: transaccionId },
       data: {
+        ...(data.cuentaId !== undefined && { cuentaId: data.cuentaId }),
         ...(data.tipo !== undefined && { tipo: data.tipo }),
         ...(data.monto !== undefined && { monto: data.monto }),
         ...(data.moneda !== undefined && { moneda: data.moneda }),
@@ -273,12 +283,27 @@ export async function actualizar(
       }
     }
 
-    // Actualizar balance si cambio monto o tipo
-    if (!diferencia.isZero()) {
+    // Actualizar balances
+    if (cambiaCuenta) {
+      // Revertir efecto en la cuenta vieja
       await tx.cuenta.update({
         where: { id: actual.cuentaId },
-        data: { balance: { increment: diferencia } },
+        data: { balance: { decrement: deltaAnterior } },
       });
+      // Aplicar nuevo efecto en la cuenta nueva
+      await tx.cuenta.update({
+        where: { id: nuevaCuentaId },
+        data: { balance: { increment: deltaNuevo } },
+      });
+    } else {
+      // Misma cuenta: aplicar solo la diferencia
+      const diferencia = restar(deltaNuevo, deltaAnterior);
+      if (!diferencia.isZero()) {
+        await tx.cuenta.update({
+          where: { id: actual.cuentaId },
+          data: { balance: { increment: diferencia } },
+        });
+      }
     }
 
     return tx.transaccion.findUniqueOrThrow({

@@ -418,13 +418,3 @@ export async function exportar(usuarioId: string, query: ExportarQuery): Promise
 
   return Papa.unparse(datos);
 }
-
-export function plantilla(): string {
-  return Papa.unparse({
-    fields: ['fecha', 'tipo', 'monto', 'descripcion', 'categoria', 'notas'],
-    data: [
-      ['2025-01-15', 'GASTO', '1500.50', 'Supermercado', 'Alimentacion', ''],
-      ['2025-01-16', 'INGRESO', '50000', 'Sueldo enero', 'Salario', 'Deposito bancario'],
-    ],
-  });
-}
