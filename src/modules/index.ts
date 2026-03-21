@@ -6,7 +6,6 @@ export * from './etiqueta/etiqueta.routes';
 export * from './cuenta/cuenta.routes'
 export * from './importacion/importacion.routes';
 export * from './moneda/moneda.routes';
-export * from './presupuesto/presupuesto.routes'
 export * from './recurrente/recurrente.routes';
 export * from './regla/regla.routes';
 export * from './reporte/reporte.routes';

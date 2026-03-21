@@ -28,8 +28,6 @@ export async function limpiarDB() {
     prisma.transaccionEtiqueta.deleteMany(),
     prisma.transferencia.deleteMany(),
     prisma.transaccion.deleteMany(),
-    prisma.presupuestoCategoria.deleteMany(),
-    prisma.presupuesto.deleteMany(),
     prisma.transaccionRecurrente.deleteMany(),
     prisma.sesion.deleteMany(),
     prisma.reglaCategorizacion.deleteMany(),

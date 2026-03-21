@@ -9,7 +9,6 @@ import {
   importacionRoutes,
   institucionRoutes,
   monedaRoutes,
-  presupuestoRoutes,
   recurrenteRoutes,
   reglaRoutes,
   reporteRoutes,
@@ -27,7 +26,6 @@ router.use(`/categorias`, categoriaRoutes);
 router.use(`/etiquetas`, etiquetaRoutes);
 router.use(`/transacciones`, transaccionRoutes);
 router.use(`/transferencias`, transferenciaRoutes);
-router.use(`/presupuestos`, presupuestoRoutes);
 router.use(`/recurrentes`, recurrenteRoutes);
 router.use(`/balances`, balanceRoutes);
 router.use(`/reportes`, reporteRoutes);

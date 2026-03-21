@@ -19,6 +19,10 @@ const envSchema = z.object({
 
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 
+  GOOGLE_CLIENT_ID: z.string().nonempty('GOOGLE_CLIENT_ID es requerida'),
+  GOOGLE_CLIENT_SECRET: z.string().nonempty('GOOGLE_CLIENT_SECRET es requerida'),
+  GOOGLE_CALLBACK_URL: z.string().default('http://localhost:3000/api/auth/google/callback'),
+
   MAX_SESIONES: z.string().default('5').transform(Number), // sesiones activas por usuario
 });
 

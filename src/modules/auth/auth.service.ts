@@ -100,6 +100,8 @@ export async function login(data: LoginInput, info: SesionInfo) {
 
   if (!usuario) throw new UnauthorizedError('Credenciales invalidas');
 
+  if (!usuario.passwordHash) throw new UnauthorizedError('Esta cuenta usa Google para iniciar sesion');
+
   const passwordValida = await comparePassword(data.password, usuario.passwordHash);
   if (!passwordValida) throw new UnauthorizedError('Credenciales invalidas');
 
@@ -203,6 +205,57 @@ export async function cerrarSesion(usuarioId: string, sesionId: string) {
 export async function cerrarTodasSesiones(usuarioId: string) {
   const resultado = await prisma.sesion.deleteMany({ where: { usuarioId } });
   return { sesionesRevocadas: resultado.count };
+}
+
+interface GoogleUserInfo {
+  id: string
+  email: string
+  name: string
+  verified_email: boolean
+}
+
+export async function loginConGoogle(googleUser: GoogleUserInfo, info: SesionInfo) {
+  // Buscar por googleId primero, luego por email
+  let usuario = await prisma.usuario.findUnique({
+    where: { googleId: googleUser.id },
+    select: { id: true, email: true, nombre: true, moneda: true, rol: true, creadoEl: true },
+  });
+
+  if (!usuario) {
+    // Buscar por email — puede ser cuenta existente con password
+    const porEmail = await prisma.usuario.findUnique({
+      where: { email: googleUser.email },
+      select: { id: true, email: true, nombre: true, moneda: true, rol: true, creadoEl: true },
+    });
+
+    if (porEmail) {
+      // Vincular cuenta existente con Google
+      usuario = await prisma.usuario.update({
+        where: { id: porEmail.id },
+        data: { googleId: googleUser.id },
+        select: { id: true, email: true, nombre: true, moneda: true, rol: true, creadoEl: true },
+      });
+    } else {
+      // Crear nuevo usuario via Google
+      usuario = await prisma.$transaction(async (tx) => {
+        const nuevo = await tx.usuario.create({
+          data: {
+            email: googleUser.email,
+            nombre: googleUser.name,
+            googleId: googleUser.id,
+          },
+          select: { id: true, email: true, nombre: true, moneda: true, rol: true, creadoEl: true },
+        });
+        await crearCategoriasDefault(nuevo.id, tx);
+        return nuevo;
+      });
+    }
+  }
+
+  const payload = buildPayload(usuario);
+  const tokens = await crearSesion(payload, info);
+
+  return { usuario, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken };
 }
 
 export async function cambiarPassword(userId: string, data: CambiarPasswordInput) {

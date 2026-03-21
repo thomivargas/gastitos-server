@@ -79,7 +79,8 @@ model Usuario {
   id            String   @id @default(uuid())
   email         String   @unique
   nombre        String
-  passwordHash  String   @map("password_hash")
+  passwordHash  String?  @map("password_hash")
+  googleId      String?  @unique @map("google_id")
   rol           Rol      @default(USUARIO)
   moneda        String   @default("ARS") // moneda principal del usuario
   preferencias  Json     @default("{}") // formato fecha, locale, zona horaria, etc.
@@ -89,7 +90,6 @@ model Usuario {
   cuentas                  Cuenta[]
   categorias               Categoria[]
   etiquetas                Etiqueta[]
-  presupuestos             Presupuesto[]
   transacciones            Transaccion[]
   transaccionesRecurrentes TransaccionRecurrente[]
   reglasCategorizacion     ReglaCategorizacion[]
@@ -183,7 +183,6 @@ model Categoria {
   padre                 Categoria?             @relation("SubCategorias", fields: [padreId], references: [id], onDelete: SetNull)
   subcategorias         Categoria[]            @relation("SubCategorias")
   transacciones         Transaccion[]
-  presupuestoCategorias PresupuestoCategoria[]
   reglasCategorizacion  ReglaCategorizacion[]
 
   @@unique([usuarioId, nombre, padreId])
@@ -291,50 +290,6 @@ model Transferencia {
   cuentaDestino      Cuenta      @relation("CuentaDestino", fields: [cuentaDestinoId], references: [id])
 
   @@map("transferencias")
-}
-
-// ============================================================================
-// PRESUPUESTOS
-// ============================================================================
-// Presupuesto por periodo (tipicamente mensual).
-// Contiene un tope general y asignaciones por categoria.
-
-model Presupuesto {
-  id                 String   @id @default(uuid())
-  usuarioId          String   @map("usuario_id")
-  fechaInicio        DateTime @map("fecha_inicio") @db.Date
-  fechaFin           DateTime @map("fecha_fin") @db.Date
-  gastoPresupuestado Decimal? @map("gasto_presupuestado") @db.Decimal(19, 4)
-  ingresoEsperado    Decimal? @map("ingreso_esperado") @db.Decimal(19, 4)
-  moneda             String
-  creadoEl           DateTime @default(now()) @map("creado_el")
-  actualizadoEl      DateTime @updatedAt @map("actualizado_el")
-
-  usuario    Usuario                @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  categorias PresupuestoCategoria[]
-
-  @@unique([usuarioId, fechaInicio, fechaFin])
-  @@map("presupuestos")
-}
-
-// ============================================================================
-// PRESUPUESTO POR CATEGORIA
-// ============================================================================
-// Cuanto se asigna a cada categoria dentro de un presupuesto.
-
-model PresupuestoCategoria {
-  id                 String   @id @default(uuid())
-  presupuestoId      String   @map("presupuesto_id")
-  categoriaId        String   @map("categoria_id")
-  montoPresupuestado Decimal  @map("monto_presupuestado") @db.Decimal(19, 4)
-  creadoEl           DateTime @default(now()) @map("creado_el")
-  actualizadoEl      DateTime @updatedAt @map("actualizado_el")
-
-  presupuesto Presupuesto @relation(fields: [presupuestoId], references: [id], onDelete: Cascade)
-  categoria   Categoria   @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
-
-  @@unique([presupuestoId, categoriaId])
-  @@map("presupuesto_categorias")
 }
 
 // ============================================================================

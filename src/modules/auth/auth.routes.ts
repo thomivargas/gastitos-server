@@ -20,4 +20,8 @@ router.get('/sesiones', authenticate, controller.listarSesiones);
 router.delete('/sesiones', authenticate, controller.cerrarTodasSesiones);
 router.delete('/sesiones/:id', authenticate, validate(idParamSchema, 'params'), controller.cerrarSesion);
 
+// Rutas de autenticación con Google
+router.get("/google", controller.googleAuth);
+router.get("/google/callback", controller.googleCallback);
+
 export const authRoutes = router;
