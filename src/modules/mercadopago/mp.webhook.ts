@@ -119,7 +119,13 @@ async function importarPagoMP(paymentId: string, mpUsuarioId: string): Promise<v
   const pago = await fetchPago(paymentId, accessToken)
 
   if (pago.status !== 'approved') return
-  if (pago.operation_type !== 'regular_payment') return
+
+  const OPERATION_TYPES_ACEPTADOS = new Set([
+    'regular_payment',
+    'money_transfer',
+    'pos_payment',
+  ])
+  if (!OPERATION_TYPES_ACEPTADOS.has(pago.operation_type)) return
 
   if (pago.payer.id == null || pago.collector.id == null) {
     logger.warn({ paymentId, pago }, 'Pago MP sin payer.id o collector.id')

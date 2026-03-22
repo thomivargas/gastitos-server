@@ -1,6 +1,8 @@
 import { createHmac, timingSafeEqual, randomUUID } from 'node:crypto'
 import { prisma } from '@config/database'
 import { env } from '@config/env'
+import { logger } from '@config/logger'
+import { Decimal } from '@utils/decimal'
 import { encrypt, decrypt } from './mp.crypto'
 
 // ─── State OAuth ─────────────────────────────────────────────────────────────
@@ -169,4 +171,142 @@ export async function guardarConexion(
       revocada: false,
     },
   })
+}
+
+// ─── Sincronización por polling ───────────────────────────────────────────────
+
+interface MpPagoResumen {
+  id: number
+  status: string
+  operation_type: string
+  transaction_amount: number
+  currency_id: string
+  description: string | null
+  date_approved: string | null
+  payer: { id: number | null }
+  collector: { id: number | null }
+}
+
+const OPERATION_TYPES_ACEPTADOS = new Set([
+  'regular_payment',
+  'money_transfer',
+  'pos_payment',
+])
+
+/**
+ * Sincroniza los pagos de MP para un usuario usando la API de búsqueda.
+ * Necesario para capturar transferencias de billetera a billetera que
+ * no generan webhooks en apps OAuth.
+ *
+ * @returns Número de transacciones importadas
+ */
+export async function sincronizarPagosMP(usuarioId: string): Promise<number> {
+  const conexion = await prisma.conexionMercadoPago.findUnique({
+    where: { usuarioId },
+  })
+  if (!conexion || conexion.revocada) return 0
+
+  const accessToken = await refrescarTokenSiNecesario(conexion.id)
+
+  // Rango: desde última sincronización o últimos 30 días
+  const desde = conexion.ultimaSincronizacion
+    ? new Date(conexion.ultimaSincronizacion.getTime() - 60_000) // 1 min overlap para evitar gaps
+    : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const hasta = new Date()
+
+  const url = new URL('https://api.mercadopago.com/v1/payments/search')
+  url.searchParams.set('status', 'approved')
+  url.searchParams.set('sort', 'date_approved')
+  url.searchParams.set('criteria', 'desc')
+  url.searchParams.set('begin_date', desde.toISOString())
+  url.searchParams.set('end_date', hasta.toISOString())
+  url.searchParams.set('limit', '100')
+  url.searchParams.set('offset', '0')
+
+  const resp = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+
+  if (!resp.ok) {
+    throw new Error(`MP payments search error: ${resp.status}`)
+  }
+
+  const data = (await resp.json()) as { results: MpPagoResumen[] }
+  const pagos = data.results ?? []
+
+  let importados = 0
+
+  for (const pago of pagos) {
+    if (!OPERATION_TYPES_ACEPTADOS.has(pago.operation_type)) continue
+    if (!pago.date_approved) continue
+
+    const paymentId = String(pago.id)
+
+    const existe = await prisma.transaccion.findUnique({
+      where: { mpPaymentId: paymentId },
+      select: { id: true },
+    })
+    if (existe) continue
+
+    const esPago = String(pago.payer.id) === conexion.mpUsuarioId
+    const esIngreso = String(pago.collector.id) === conexion.mpUsuarioId
+    if (!esPago && !esIngreso) continue
+
+    const tipo = esPago ? 'GASTO' : 'INGRESO'
+    const descripcion = pago.description?.trim() || 'Pago Mercado Pago'
+    const monto = new Decimal(pago.transaction_amount)
+    const delta = tipo === 'INGRESO' ? monto : monto.negated()
+    const fecha = new Date(pago.date_approved)
+
+    let categoriaId: string | null = null
+    try {
+      const { sugerirCategoria } = await import('../regla/regla.service')
+      const sugerencia = await sugerirCategoria(conexion.usuarioId, descripcion)
+      if (sugerencia) categoriaId = sugerencia.id
+    } catch {
+      // Si falla, crear sin categoria
+    }
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.transaccion.create({
+          data: {
+            usuarioId: conexion.usuarioId,
+            cuentaId: conexion.cuentaId,
+            tipo,
+            monto,
+            moneda: pago.currency_id,
+            fecha,
+            descripcion,
+            categoriaId,
+            mpPaymentId: paymentId,
+          },
+        })
+
+        await tx.cuenta.update({
+          where: { id: conexion.cuentaId },
+          data: { balance: { increment: delta } },
+        })
+      })
+      importados++
+    } catch (err: unknown) {
+      // P2002 = unique constraint (pago ya existe) — ignorar
+      if ((err as { code?: string }).code !== 'P2002') {
+        logger.error({ err, paymentId }, 'Error importando pago MP en sync')
+      }
+    }
+  }
+
+  // Actualizar timestamp de última sincronización
+  await prisma.conexionMercadoPago.update({
+    where: { id: conexion.id },
+    data: { ultimaSincronizacion: hasta },
+  })
+
+  logger.info(
+    { usuarioId, importados, total: pagos.length },
+    'Sincronizacion MP completada',
+  )
+
+  return importados
 }

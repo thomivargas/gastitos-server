@@ -9,6 +9,7 @@ const router = Router()
 router.get('/conectar', authenticate, controller.iniciarConexion)
 router.get('/estado', authenticate, controller.obtenerEstado)
 router.delete('/desconectar', authenticate, controller.desconectar)
+router.post('/sincronizar', authenticate, controller.sincronizar)
 
 // Callback: sin JWT (redirect de MP)
 router.get('/callback', controller.callback)

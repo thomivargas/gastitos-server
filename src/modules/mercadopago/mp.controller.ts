@@ -7,6 +7,7 @@ import {
   validarState,
   intercambiarCodigo,
   guardarConexion,
+  sincronizarPagosMP,
 } from './mp.service'
 import { conectarQuerySchema, callbackQuerySchema } from './mp.schema'
 
@@ -90,4 +91,13 @@ export const desconectar = asyncHandler(async (req: Request, res: Response) => {
     where: { usuarioId: req.user!.sub },
   })
   res.json({ status: 'ok', data: null })
+})
+
+/**
+ * POST /api/mercadopago/sincronizar
+ * Sincroniza manualmente los pagos de MP para el usuario autenticado.
+ */
+export const sincronizar = asyncHandler(async (req: Request, res: Response) => {
+  const importados = await sincronizarPagosMP(req.user!.sub)
+  res.json({ status: 'ok', data: { importados } })
 })

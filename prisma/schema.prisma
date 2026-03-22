@@ -423,9 +423,10 @@ model ConexionMercadoPago {
   refreshToken  String   @map("refresh_token")
   expiresAt     DateTime @map("expires_at")
   cuentaId      String   @unique @map("cuenta_id")
-  revocada      Boolean  @default(false)
-  creadoEl      DateTime @default(now()) @map("creado_el")
-  actualizadoEl DateTime @updatedAt @map("actualizado_el")
+  revocada              Boolean   @default(false)
+  ultimaSincronizacion  DateTime? @map("ultima_sincronizacion")
+  creadoEl              DateTime  @default(now()) @map("creado_el")
+  actualizadoEl         DateTime  @updatedAt @map("actualizado_el")
 
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   cuenta  Cuenta  @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
