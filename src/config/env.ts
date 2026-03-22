@@ -24,6 +24,15 @@ const envSchema = z.object({
   GOOGLE_CALLBACK_URL: z.string().default('http://localhost:3000/api/auth/google/callback'),
 
   MAX_SESIONES: z.string().default('5').transform(Number), // sesiones activas por usuario
+
+  // Mercado Pago (opcional en dev)
+  MP_CLIENT_ID: z.string().min(1).optional(),
+  MP_CLIENT_SECRET: z.string().min(1).optional(),
+  MP_REDIRECT_URI: z.string().url().optional(),
+  MP_WEBHOOK_SECRET: z.string().min(16).optional(),
+  MP_STATE_SECRET: z.string().min(16).optional(),
+  // 64 hex chars = 32 bytes para AES-256-GCM
+  ENCRYPTION_KEY: z.string().length(64).optional(),
 });
 
 // Validar y parsear — lanza error descriptivo si algo falta
