@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { authenticate } from '@middlewares/auth.middleware'
 import * as controller from './mp.controller'
+import { handleWebhook } from './mp.webhook'
 
 const router = Router()
 
@@ -12,7 +13,7 @@ router.delete('/desconectar', authenticate, controller.desconectar)
 // Callback: sin JWT (redirect de MP)
 router.get('/callback', controller.callback)
 
-// Webhook placeholder (implementado en Task 5)
-// router.post('/webhook', handleWebhook)
+// Webhook: sin JWT (llamado por Mercado Pago)
+router.post('/webhook', handleWebhook)
 
 export const mpRoutes = router
