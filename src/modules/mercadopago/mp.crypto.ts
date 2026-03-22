@@ -11,6 +11,7 @@ const TAG_LENGTH = 16  // 128 bits
  * @returns `iv_hex:authTag_hex:ciphertext_hex`
  */
 export function encrypt(plaintext: string, keyHex: string): string {
+  if (keyHex.length !== 64) throw new Error('Clave debe tener exactamente 64 caracteres hex (32 bytes)')
   const key = Buffer.from(keyHex, 'hex')
   const iv = randomBytes(IV_LENGTH)
   const cipher = createCipheriv(ALGORITHM, key, iv, { authTagLength: TAG_LENGTH })
@@ -29,10 +30,12 @@ export function encrypt(plaintext: string, keyHex: string): string {
  * @param keyHex - Clave de 64 caracteres hex (32 bytes)
  */
 export function decrypt(encryptedStr: string, keyHex: string): string {
+  if (keyHex.length !== 64) throw new Error('Clave debe tener exactamente 64 caracteres hex (32 bytes)')
   const parts = encryptedStr.split(':')
   if (parts.length !== 3) throw new Error('Formato de token encriptado inválido')
 
-  const [ivHex, tagHex, ciphertextHex] = parts as [string, string, string]
+  const [ivHex, tagHex, ciphertextHex] = parts
+  if (!ivHex || !tagHex || !ciphertextHex) throw new Error('Formato de token encriptado inválido')
   const key = Buffer.from(keyHex, 'hex')
   const iv = Buffer.from(ivHex, 'hex')
   const tag = Buffer.from(tagHex, 'hex')

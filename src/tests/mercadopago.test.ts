@@ -24,4 +24,9 @@ describe('mp.crypto', () => {
   it('lanza error si el ciphertext está corrupto', () => {
     expect(() => decrypt('invalido:invalido:invalido', TEST_KEY)).toThrow()
   })
+
+  it('lanza error si la clave no tiene 64 caracteres hex', () => {
+    expect(() => encrypt('test', 'clave_corta')).toThrow('64 caracteres hex')
+    expect(() => decrypt('aa:bb:cc', 'clave_corta')).toThrow('64 caracteres hex')
+  })
 })
