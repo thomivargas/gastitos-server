@@ -248,8 +248,8 @@ export async function sincronizarPagosMP(usuarioId: string): Promise<number> {
     })
     if (existe) continue
 
-    const esPago = String(pago.payer.id) === conexion.mpUsuarioId
-    const esIngreso = String(pago.collector.id) === conexion.mpUsuarioId
+    const esPago = pago.payer?.id != null && String(pago.payer.id) === conexion.mpUsuarioId
+    const esIngreso = pago.collector?.id != null && String(pago.collector.id) === conexion.mpUsuarioId
     if (!esPago && !esIngreso) continue
 
     const tipo = esPago ? 'GASTO' : 'INGRESO'

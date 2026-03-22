@@ -127,7 +127,7 @@ async function importarPagoMP(paymentId: string, mpUsuarioId: string): Promise<v
   ])
   if (!OPERATION_TYPES_ACEPTADOS.has(pago.operation_type)) return
 
-  if (pago.payer.id == null || pago.collector.id == null) {
+  if (pago.payer?.id == null || pago.collector?.id == null) {
     logger.warn({ paymentId, pago }, 'Pago MP sin payer.id o collector.id')
     return
   }
