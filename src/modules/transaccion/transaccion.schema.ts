@@ -19,6 +19,7 @@ export const crearTransaccionSchema = z.object({
 });
 
 export const actualizarTransaccionSchema = z.object({
+  cuentaId: z.string().uuid().optional(),
   tipo: tipoTransaccionEnum.optional(),
   monto: z.number().positive().optional(),
   moneda: z.string().length(3).toUpperCase().optional(),

@@ -232,7 +232,7 @@ export async function actualizar(
   // Verificar que la nueva cuenta exista y pertenezca al usuario
   if (cambiaCuenta) {
     const cuenta = await prisma.cuenta.findFirst({
-      where: { id: data.cuentaId, usuarioId },
+      where: { id: data.cuentaId!, usuarioId },
       select: { id: true },
     });
     if (!cuenta) throw new NotFoundError('Cuenta');

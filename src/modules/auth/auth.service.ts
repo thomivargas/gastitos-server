@@ -265,6 +265,7 @@ export async function cambiarPassword(userId: string, data: CambiarPasswordInput
   });
 
   if (!usuario) throw new UnauthorizedError('Usuario no encontrado');
+  if (!usuario.passwordHash) throw new BadRequestError('El usuario no tiene password configurada');
 
   const passwordValida = await comparePassword(data.passwordActual, usuario.passwordHash);
   if (!passwordValida) throw new BadRequestError('La contrasena actual es incorrecta');
