@@ -191,6 +191,7 @@ const OPERATION_TYPES_ACEPTADOS = new Set([
   'regular_payment',
   'money_transfer',
   'pos_payment',
+  'account_fund',  // dinero recibido en la billetera MP
 ])
 
 /**
@@ -239,19 +240,8 @@ export async function sincronizarPagosMP(usuarioId: string): Promise<number> {
   let importados = 0
 
   for (const pago of pagos) {
-    logger.info(
-      { id: pago.id, status: pago.status, operation_type: pago.operation_type, date_approved: pago.date_approved, collector_id: pago.collector?.id, payer_id: pago.payer?.id, mpUsuarioId: conexion.mpUsuarioId },
-      'MP sync: procesando pago',
-    )
-
-    if (!OPERATION_TYPES_ACEPTADOS.has(pago.operation_type)) {
-      logger.info({ id: pago.id, operation_type: pago.operation_type }, 'MP sync: descartado por operation_type')
-      continue
-    }
-    if (!pago.date_approved) {
-      logger.info({ id: pago.id }, 'MP sync: descartado por date_approved nulo')
-      continue
-    }
+    if (!OPERATION_TYPES_ACEPTADOS.has(pago.operation_type)) continue
+    if (!pago.date_approved) continue
 
     const paymentId = String(pago.id)
 
@@ -259,14 +249,13 @@ export async function sincronizarPagosMP(usuarioId: string): Promise<number> {
       where: { mpPaymentId: paymentId },
       select: { id: true },
     })
-    if (existe) {
-      logger.info({ id: pago.id }, 'MP sync: descartado, ya existe en DB')
-      continue
-    }
+    if (existe) continue
 
-    // La API ya filtra por el token del usuario — los pagos devueltos son suyos.
-    // Si es collector → recibió dinero (INGRESO); si no → lo envió (GASTO).
-    const esIngreso = pago.collector?.id != null && String(pago.collector.id) === conexion.mpUsuarioId
+    // account_fund = fondos que entran a la billetera (siempre INGRESO).
+    // Para otros tipos: si el usuario es collector → INGRESO; si no → GASTO.
+    const esIngreso =
+      pago.operation_type === 'account_fund' ||
+      (pago.collector?.id != null && String(pago.collector.id) === conexion.mpUsuarioId)
 
     const tipo = esIngreso ? 'INGRESO' : 'GASTO'
     const descripcion = pago.description?.trim() || 'Pago Mercado Pago'
