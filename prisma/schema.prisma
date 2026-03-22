@@ -95,6 +95,7 @@ model Usuario {
   reglasCategorizacion     ReglaCategorizacion[]
   sesiones                 Sesion[]
   instituciones            Institucion[]
+  conexionMercadoPago      ConexionMercadoPago?
 
   @@map("usuarios")
 }
@@ -132,6 +133,7 @@ model Cuenta {
   transferenciasOrigen     Transferencia[]        @relation("CuentaOrigen")
   transferenciasDestino    Transferencia[]        @relation("CuentaDestino")
   transaccionesRecurrentes TransaccionRecurrente[]
+  conexionMercadoPago      ConexionMercadoPago?
 
   @@index([usuarioId, estado])
   @@index([usuarioId, tipo])
@@ -234,6 +236,7 @@ model Transaccion {
   tasaCambio    Decimal?        @map("tasa_cambio") @db.Decimal(19, 10) // tasa usada si moneda != cuenta.moneda
   montoOriginal  Decimal?       @map("monto_original") @db.Decimal(19, 4)
   monedaOriginal String?        @map("moneda_original")
+  mpPaymentId   String?         @unique @map("mp_payment_id")
   creadoEl      DateTime        @default(now()) @map("creado_el")
   actualizadoEl DateTime        @updatedAt @map("actualizado_el")
 
@@ -407,4 +410,25 @@ model Sesion {
   @@index([usuarioId])
   @@index([expiraEl])
   @@map("sesiones")
+}
+
+// ============================================================================
+// CONEXION MERCADO PAGO
+// ============================================================================
+model ConexionMercadoPago {
+  id            String   @id @default(uuid())
+  usuarioId     String   @unique @map("usuario_id")
+  mpUsuarioId   String   @map("mp_usuario_id")
+  accessToken   String   @map("access_token")
+  refreshToken  String   @map("refresh_token")
+  expiresAt     DateTime @map("expires_at")
+  cuentaId      String   @unique @map("cuenta_id")
+  revocada      Boolean  @default(false)
+  creadoEl      DateTime @default(now()) @map("creado_el")
+  actualizadoEl DateTime @updatedAt @map("actualizado_el")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  cuenta  Cuenta  @relation(fields: [cuentaId], references: [id], onDelete: Cascade)
+
+  @@map("conexiones_mercadopago")
 }
