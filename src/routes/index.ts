@@ -9,6 +9,7 @@ import {
   importacionRoutes,
   institucionRoutes,
   monedaRoutes,
+  mpRoutes,
   recurrenteRoutes,
   reglaRoutes,
   reporteRoutes,
@@ -34,5 +35,6 @@ router.use(`/monedas`, monedaRoutes);
 router.use(`/importacion`, importacionRoutes);
 router.use(`/reglas`, reglaRoutes);
 router.use(`/admin`, adminRoutes);
+router.use(`/mercadopago`, mpRoutes);
 
 export default router;

@@ -13,3 +13,4 @@ export * from './transaccion/transaccion.routes';
 export * from './transferencia/transferencia.routes';
 export * from './usuario/usuario.routes';
 export * from './institucion/institucion.routes';
+export * from './mercadopago/mp.routes';
