@@ -235,13 +235,14 @@ export async function sincronizarPagosMP(usuarioId: string): Promise<number> {
   const data = (await resp.json()) as { results: MpPagoResumen[] }
   const pagos = data.results ?? []
 
-  logger.info({ usuarioId, total: pagos.length }, 'MP sync: pagos recibidos de la API')
+  logger.info({ usuarioId, desde: desde.toISOString(), hasta: hasta.toISOString(), total: pagos.length }, 'MP sync: pagos recibidos de la API')
 
   let importados = 0
 
   for (const pago of pagos) {
-    if (!OPERATION_TYPES_ACEPTADOS.has(pago.operation_type)) continue
-    if (!pago.date_approved) continue
+    logger.info({ id: pago.id, operation_type: pago.operation_type, status: pago.status, date_approved: pago.date_approved, payer_id: pago.payer?.id, collector_id: pago.collector?.id }, 'MP sync: pago')
+    if (!OPERATION_TYPES_ACEPTADOS.has(pago.operation_type)) { logger.info({ id: pago.id, operation_type: pago.operation_type }, 'skip: operation_type'); continue }
+    if (!pago.date_approved) { logger.info({ id: pago.id }, 'skip: date_approved null'); continue }
 
     const paymentId = String(pago.id)
 
@@ -249,7 +250,7 @@ export async function sincronizarPagosMP(usuarioId: string): Promise<number> {
       where: { mpPaymentId: paymentId },
       select: { id: true },
     })
-    if (existe) continue
+    if (existe) { logger.info({ id: pago.id }, 'skip: ya existe'); continue }
 
     // account_fund = fondos que entran a la billetera (siempre INGRESO).
     // Para otros tipos: si el usuario es collector → INGRESO; si no → GASTO.
