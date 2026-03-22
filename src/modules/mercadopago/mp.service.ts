@@ -211,7 +211,7 @@ export async function sincronizarPagosMP(usuarioId: string): Promise<number> {
 
   // Rango: desde última sincronización o últimos 30 días
   const desde = conexion.ultimaSincronizacion
-    ? new Date(conexion.ultimaSincronizacion.getTime() - 60_000) // 1 min overlap para evitar gaps
+    ? new Date(conexion.ultimaSincronizacion.getTime() - 60 * 60 * 1000) // 1h overlap para evitar gaps
     : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
   const hasta = new Date()
 
