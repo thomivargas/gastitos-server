@@ -234,11 +234,35 @@ export async function sincronizarPagosMP(usuarioId: string): Promise<number> {
   const data = (await resp.json()) as { results: MpPagoResumen[] }
   const pagos = data.results ?? []
 
+  logger.info(
+    {
+      usuarioId,
+      mpUsuarioId: conexion.mpUsuarioId,
+      total: pagos.length,
+      pagos: pagos.map((p) => ({
+        id: p.id,
+        status: p.status,
+        operation_type: p.operation_type,
+        monto: p.transaction_amount,
+        date_approved: p.date_approved,
+        payer_id: p.payer?.id,
+        collector_id: p.collector?.id,
+      })),
+    },
+    'MP sync: pagos recibidos de la API',
+  )
+
   let importados = 0
 
   for (const pago of pagos) {
-    if (!OPERATION_TYPES_ACEPTADOS.has(pago.operation_type)) continue
-    if (!pago.date_approved) continue
+    if (!OPERATION_TYPES_ACEPTADOS.has(pago.operation_type)) {
+      logger.info({ id: pago.id, operation_type: pago.operation_type }, 'MP sync: pago ignorado por operation_type')
+      continue
+    }
+    if (!pago.date_approved) {
+      logger.info({ id: pago.id }, 'MP sync: pago ignorado por date_approved nulo')
+      continue
+    }
 
     const paymentId = String(pago.id)
 
@@ -250,7 +274,13 @@ export async function sincronizarPagosMP(usuarioId: string): Promise<number> {
 
     const esPago = pago.payer?.id != null && String(pago.payer.id) === conexion.mpUsuarioId
     const esIngreso = pago.collector?.id != null && String(pago.collector.id) === conexion.mpUsuarioId
-    if (!esPago && !esIngreso) continue
+    if (!esPago && !esIngreso) {
+      logger.info(
+        { id: pago.id, payer_id: pago.payer?.id, collector_id: pago.collector?.id, mpUsuarioId: conexion.mpUsuarioId },
+        'MP sync: pago ignorado porque no pertenece al usuario',
+      )
+      continue
+    }
 
     const tipo = esPago ? 'GASTO' : 'INGRESO'
     const descripcion = pago.description?.trim() || 'Pago Mercado Pago'
