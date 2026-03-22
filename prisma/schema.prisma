@@ -418,7 +418,7 @@ model Sesion {
 model ConexionMercadoPago {
   id            String   @id @default(uuid())
   usuarioId     String   @unique @map("usuario_id")
-  mpUsuarioId   String   @map("mp_usuario_id")
+  mpUsuarioId   String   @unique @map("mp_usuario_id")
   accessToken   String   @map("access_token")
   refreshToken  String   @map("refresh_token")
   expiresAt     DateTime @map("expires_at")
