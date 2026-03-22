@@ -37,7 +37,7 @@ export const iniciarConexion = asyncHandler(async (req: Request, res: Response) 
   url.searchParams.set('redirect_uri', env.MP_REDIRECT_URI!)
   url.searchParams.set('state', state)
 
-  res.redirect(url.toString())
+  res.json({ status: 'ok', data: { url: url.toString() } })
 })
 
 /**
