@@ -239,8 +239,19 @@ export async function sincronizarPagosMP(usuarioId: string): Promise<number> {
   let importados = 0
 
   for (const pago of pagos) {
-    if (!OPERATION_TYPES_ACEPTADOS.has(pago.operation_type)) continue
-    if (!pago.date_approved) continue
+    logger.info(
+      { id: pago.id, status: pago.status, operation_type: pago.operation_type, date_approved: pago.date_approved, collector_id: pago.collector?.id, payer_id: pago.payer?.id, mpUsuarioId: conexion.mpUsuarioId },
+      'MP sync: procesando pago',
+    )
+
+    if (!OPERATION_TYPES_ACEPTADOS.has(pago.operation_type)) {
+      logger.info({ id: pago.id, operation_type: pago.operation_type }, 'MP sync: descartado por operation_type')
+      continue
+    }
+    if (!pago.date_approved) {
+      logger.info({ id: pago.id }, 'MP sync: descartado por date_approved nulo')
+      continue
+    }
 
     const paymentId = String(pago.id)
 
@@ -248,7 +259,10 @@ export async function sincronizarPagosMP(usuarioId: string): Promise<number> {
       where: { mpPaymentId: paymentId },
       select: { id: true },
     })
-    if (existe) continue
+    if (existe) {
+      logger.info({ id: pago.id }, 'MP sync: descartado, ya existe en DB')
+      continue
+    }
 
     // La API ya filtra por el token del usuario — los pagos devueltos son suyos.
     // Si es collector → recibió dinero (INGRESO); si no → lo envió (GASTO).
