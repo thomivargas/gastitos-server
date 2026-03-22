@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { encrypt, decrypt } from '../modules/mercadopago/mp.crypto'
 import { construirState, validarState } from '../modules/mercadopago/mp.service'
-import { validarFirmaWebhook } from '../modules/mercadopago/mp.webhook'
 
 const TEST_KEY = 'a'.repeat(64)
 
@@ -67,29 +66,3 @@ describe('mp.service - state OAuth', () => {
   })
 })
 
-// ─── Helpers HMAC ─────────────────────────────────────────────────────────────
-
-function buildXSignature(dataId: string, xRequestId: string, ts: string, secret: string): string {
-  const { createHmac } = require('node:crypto')
-  const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`
-  const hash = createHmac('sha256', secret).update(manifest).digest('hex')
-  return `ts=${ts},v1=${hash}`
-}
-
-describe('validarFirmaWebhook', () => {
-  const secret = 'test_webhook_secret_16chars!'
-
-  it('acepta firma HMAC valida', () => {
-    const dataId = '12345'
-    const xRequestId = 'req-abc'
-    const ts = String(Date.now())
-    const xSig = buildXSignature(dataId, xRequestId, ts, secret)
-    expect(() => validarFirmaWebhook(xSig, xRequestId, dataId, secret)).not.toThrow()
-  })
-
-  it('rechaza firma alterada', () => {
-    expect(() =>
-      validarFirmaWebhook('ts=123,v1=firma_falsa', 'req-abc', '12345', secret)
-    ).toThrow()
-  })
-})

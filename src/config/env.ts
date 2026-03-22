@@ -29,7 +29,6 @@ const envSchema = z.object({
   MP_CLIENT_ID: z.string().min(1).optional(),
   MP_CLIENT_SECRET: z.string().min(1).optional(),
   MP_REDIRECT_URI: z.string().url().optional(),
-  MP_WEBHOOK_SECRET: z.string().min(16).optional(),
   MP_STATE_SECRET: z.string().min(16).optional(),
   // 64 hex chars = 32 bytes para AES-256-GCM
   ENCRYPTION_KEY: z.string().length(64).optional(),
